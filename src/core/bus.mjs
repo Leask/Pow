@@ -1,6 +1,6 @@
-import { Controller } from './controller.js';
-import { APU } from './apu.js';
-import { PPU } from './ppu.js';
+import { Controller } from './controller.mjs';
+import { APU } from './apu.mjs';
+import { PPU } from './ppu.mjs';
 
 class Bus {
     constructor(cartridge) {

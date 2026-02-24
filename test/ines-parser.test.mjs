@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseINESHeader } from '../src/core/ines.js';
+import { parseINESHeader } from '../src/core/ines.mjs';
 
 test('parses Mario.nes iNES metadata correctly', () => {
     const romPath = path.resolve(process.cwd(), 'Mario.nes');

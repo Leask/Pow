@@ -1,6 +1,8 @@
-import { MapperBase } from './mapper-base.js';
+import { MapperBase } from './mapper-base.mjs';
 
-class MapperNROM extends MapperBase {
+class MapperCNROM extends MapperBase {
+    #chrBank = 0;
+
     cpuRead(address) {
         if (address >= 0x6000 && address <= 0x7fff) {
             return this.cartridge.prgRam[address - 0x6000];
@@ -20,12 +22,18 @@ class MapperNROM extends MapperBase {
     cpuWrite(address, value) {
         if (address >= 0x6000 && address <= 0x7fff) {
             this.cartridge.prgRam[address - 0x6000] = value & 0xff;
+            return;
+        }
+
+        if (address >= 0x8000) {
+            this.#chrBank = value & 0x03;
         }
     }
 
     ppuRead(address) {
         if (address < 0x2000) {
-            return this.cartridge.chr[address];
+            const bankOffset = this.#chrBank * 0x2000;
+            return this.cartridge.chr[bankOffset + address];
         }
 
         return 0;
@@ -33,11 +41,22 @@ class MapperNROM extends MapperBase {
 
     ppuWrite(address, value) {
         if (address < 0x2000 && this.cartridge.hasChrRam) {
-            this.cartridge.chr[address] = value & 0xff;
+            const bankOffset = this.#chrBank * 0x2000;
+            this.cartridge.chr[bankOffset + address] = value & 0xff;
         }
+    }
+
+    saveState() {
+        return {
+            chrBank: this.#chrBank,
+        };
+    }
+
+    loadState(state) {
+        this.#chrBank = state.chrBank & 0xff;
     }
 }
 
 export {
-    MapperNROM,
+    MapperCNROM,
 };

@@ -1,4 +1,4 @@
-import { MapperBase } from './mapper-base.js';
+import { MapperBase } from './mapper-base.mjs';
 
 class MapperUxROM extends MapperBase {
     #bankSelect = 0;

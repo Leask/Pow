@@ -3,10 +3,13 @@
     "version": "1.0.0",
     "description": "Modern minimalist self-hosted NES emulator core",
     "type": "module",
-    "main": "src/index.js",
+    "main": "src/index.mjs",
+    "exports": {
+        ".": "./src/index.mjs"
+    },
     "scripts": {
-        "start": "node src/cli/run-headless.js --rom ./Mario.nes --frames 120",
-        "smoke": "node src/cli/run-headless.js --rom ./Mario.nes --frames 120",
+        "start": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
+        "smoke": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
         "test": "node --test"
     },
     "keywords": [

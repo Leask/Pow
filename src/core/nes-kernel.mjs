@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseINESHeader } from './ines.js';
-import { Cartridge } from './cartridge.js';
-import { Bus } from './bus.js';
-import { CPU6502 } from './cpu6502.js';
-import { BUTTON_ORDER } from './controller.js';
+import { parseINESHeader } from './ines.mjs';
+import { Cartridge } from './cartridge.mjs';
+import { Bus } from './bus.mjs';
+import { CPU6502 } from './cpu6502.mjs';
+import { BUTTON_ORDER } from './controller.mjs';
 
 function toBuffer(data) {
     if (Buffer.isBuffer(data)) {

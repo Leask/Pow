@@ -1,10 +1,10 @@
 import {
     splitINESRom,
     PRG_RAM_BANK_SIZE,
-} from './ines.js';
-import { MapperNROM } from './mappers/mapper-000-nrom.js';
-import { MapperUxROM } from './mappers/mapper-002-uxrom.js';
-import { MapperCNROM } from './mappers/mapper-003-cnrom.js';
+} from './ines.mjs';
+import { MapperNROM } from './mappers/mapper-000-nrom.mjs';
+import { MapperUxROM } from './mappers/mapper-002-uxrom.mjs';
+import { MapperCNROM } from './mappers/mapper-003-cnrom.mjs';
 
 const MAPPER_FACTORY = Object.freeze({
     0: (cartridge) => new MapperNROM(cartridge),

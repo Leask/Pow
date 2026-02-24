@@ -1,7 +1,7 @@
 import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NESKernel } from '../src/core/nes-kernel.js';
+import { NESKernel } from '../src/core/nes-kernel.mjs';
 
 test('loads Mario.nes and executes frames without crashing', () => {
     const romPath = path.resolve(process.cwd(), 'Mario.nes');

@@ -39,14 +39,14 @@ npm test
 ## CLI options
 
 ```bash
-node src/cli/run-headless.js --rom ./Mario.nes --frames 240
-node src/cli/run-headless.js --rom ./Mario.nes --frames 240 --strict-opcodes
+node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240
+node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240 --strict-opcodes
 ```
 
 ## Public API
 
 ```js
-import { NESKernel } from './src/index.js';
+import { NESKernel } from './src/index.mjs';
 
 const kernel = new NESKernel();
 kernel.loadROMFromFile('./Mario.nes');

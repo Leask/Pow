@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { NESKernel } from '../core/nes-kernel.js';
+import { NESKernel } from '../core/nes-kernel.mjs';
 
 function parseArgs(argv) {
     const options = {
@@ -40,7 +40,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-    console.log('Usage: node src/cli/run-headless.js [options]');
+    console.log('Usage: node src/cli/run-headless.mjs [options]');
     console.log('');
     console.log('Options:');
     console.log('  --rom <path>         Path to a .nes ROM file');
