@@ -4,6 +4,8 @@ A JS NES emulator developed from scratch. It features zero external
 dependencies and utilizes the latest JS features to ensure a thoroughly
 modern, powerful, and stable experience.
 
+<img width="1002" height="947" alt="Screenshot 2026-02-24 at 1 20 54 PM" src="https://github.com/user-attachments/assets/4eaa2055-bc47-4b12-a268-aa794195d9d1" />
+
 ## Highlights
 
 - 100% self-hosted emulator core, no external emulator libraries
