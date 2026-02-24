@@ -58,7 +58,7 @@ npm run gui
 Open:
 
 ```text
-http://127.0.0.1:8080
+http://127.0.0.1:8184
 ```
 
 Then load a `.nes` file from the GUI. Controls:
