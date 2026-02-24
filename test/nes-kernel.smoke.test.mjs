@@ -1,12 +1,14 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NESKernel } from '../src/core/nes-kernel.mjs';
 
 test('loads Mario.nes and executes frames without crashing', () => {
     const romPath = path.resolve(process.cwd(), 'Mario.nes');
+    const romData = fs.readFileSync(romPath);
     const kernel = new NESKernel();
-    const metadata = kernel.loadROMFromFile(romPath);
+    const metadata = kernel.loadROMBuffer(romData);
 
     assert.equal(metadata.mapperId, 0);
 
@@ -24,9 +26,10 @@ test('loads Mario.nes and executes frames without crashing', () => {
 
 test('supports basic button input calls', () => {
     const romPath = path.resolve(process.cwd(), 'Mario.nes');
+    const romData = fs.readFileSync(romPath);
     const kernel = new NESKernel();
 
-    kernel.loadROMFromFile(romPath);
+    kernel.loadROMBuffer(romData);
     kernel.pressButton(1, 'START');
     kernel.runFrames(1);
     kernel.releaseButton(1, 'START');
@@ -37,9 +40,10 @@ test('supports basic button input calls', () => {
 
 test('can save and restore deterministic state', () => {
     const romPath = path.resolve(process.cwd(), 'Mario.nes');
+    const romData = fs.readFileSync(romPath);
     const kernel = new NESKernel();
 
-    kernel.loadROMFromFile(romPath);
+    kernel.loadROMBuffer(romData);
     kernel.runFrames(5);
     const snapshot = kernel.saveState();
     kernel.runFrames(20);

@@ -20,7 +20,7 @@ test('parses Mario.nes iNES metadata correctly', () => {
 });
 
 test('throws when ROM header is invalid', () => {
-    const invalidRom = Buffer.alloc(16);
+    const invalidRom = new Uint8Array(16);
 
     assert.throws(
         () => parseINESHeader(invalidRom),

@@ -21,7 +21,8 @@
     "scripts": {
         "start": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
         "smoke": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
-        "test": "node --test"
+        "test": "node --test",
+        "gui": "PORT=8184 node src/cli/serve-gui.mjs"
     },
     "keywords": [
         "nes",
@@ -30,5 +31,5 @@
         "headless"
     ],
     "author": "",
-    "license": "ISC"
+    "license": "MIT"
 }

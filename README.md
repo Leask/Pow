@@ -10,20 +10,15 @@ modern, powerful, and stable experience.
 - Modern ESM-only codebase (`.mjs`)
 - Deterministic save/load state support
 - Headless CLI execution for CI and regression testing
+- Minimal browser HTML GUI with Canvas rendering
 - Strict-opcode mode for compatibility validation
 
 ## Implemented Core Features
 
 - iNES parser and ROM loader
-- Cartridge abstraction + mapper system
-  - Mapper `0` (NROM)
-  - Mapper `2` (UxROM)
-  - Mapper `3` (CNROM)
+- Cartridge abstraction + mapper system (`0`, `2`, `3`)
 - 6502 CPU core with mainstream instruction coverage
-- PPU pipeline
-  - VBlank / NMI timing
-  - VRAM, OAM, and DMA behavior
-  - Background + sprite composition
+- PPU pipeline with VBlank/NMI, VRAM/OAM, DMA, background/sprite rendering
 - Bus, controller ports, and memory map integration
 
 ## Requirements
@@ -44,11 +39,33 @@ Run smoke execution with `Mario.nes`:
 npm run smoke
 ```
 
-Run full test suite:
+Run test suite:
 
 ```bash
 npm test
 ```
+
+## Browser GUI
+
+Start local static server:
+
+```bash
+npm run gui
+```
+
+Open:
+
+```text
+http://127.0.0.1:8080
+```
+
+Then load a `.nes` file from the GUI. Controls:
+
+- Keyboard: Arrow keys / WASD
+- A: `J`
+- B: `K`
+- Start: `Enter`
+- Select: `Shift`
 
 ## CLI
 
@@ -63,22 +80,22 @@ Arguments:
 - `--frames <n>`: Number of frames to execute
 - `--strict-opcodes`: Throw when unsupported opcode is encountered
 
-## Public API
+## Public API (Node)
 
 ```js
+import fs from 'node:fs';
 import { NESKernel } from './src/index.mjs';
 
+const romData = fs.readFileSync('./Mario.nes');
 const kernel = new NESKernel();
-kernel.loadROMFromFile('./Mario.nes');
+kernel.loadROMBuffer(romData);
 kernel.runFrames(60);
 console.log(kernel.getExecutionState());
 ```
 
 ## Current Scope and Roadmap
 
-Current focus is a stable and testable emulator kernel. Next milestones:
-
-- Web canvas renderer adapter
-- WebAudio APU output path
-- Expanded mapper coverage for broader ROM compatibility
-- Compatibility benchmark suite and ROM matrix
+- Stabilize browser GUI and controls
+- Add WebAudio APU output path
+- Expand mapper coverage for broader ROM compatibility
+- Build compatibility benchmark suite and ROM matrix

@@ -5,20 +5,30 @@ const PRG_ROM_BANK_SIZE = 16 * 1024;
 const CHR_ROM_BANK_SIZE = 8 * 1024;
 const PRG_RAM_BANK_SIZE = 8 * 1024;
 
-function toBuffer(data) {
-    if (Buffer.isBuffer(data)) {
+function toByteArray(data) {
+    if (data instanceof Uint8Array) {
         return data;
     }
 
-    if (data instanceof Uint8Array) {
-        return Buffer.from(data);
+    if (ArrayBuffer.isView(data)) {
+        return new Uint8Array(
+            data.buffer,
+            data.byteOffset,
+            data.byteLength,
+        );
     }
 
-    throw new TypeError('ROM data must be Buffer or Uint8Array.');
+    if (data instanceof ArrayBuffer) {
+        return new Uint8Array(data);
+    }
+
+    throw new TypeError(
+        'ROM data must be Uint8Array, ArrayBuffer, or TypedArray view.',
+    );
 }
 
 function parseINESHeader(data) {
-    const rom = toBuffer(data);
+    const rom = toByteArray(data);
 
     if (rom.length < HEADER_SIZE) {
         throw new RangeError('ROM is too small for iNES header.');
@@ -78,7 +88,7 @@ function parseINESHeader(data) {
 }
 
 function splitINESRom(data) {
-    const rom = toBuffer(data);
+    const rom = toByteArray(data);
     const header = parseINESHeader(rom);
     const prgRomEnd = header.romDataOffset + header.prgRomBytes;
     const chrRomEnd = prgRomEnd + header.chrRomBytes;

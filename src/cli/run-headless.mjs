@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { NESKernel } from '../core/nes-kernel.mjs';
 
@@ -62,15 +63,16 @@ function main() {
     }
 
     const romPath = path.resolve(process.cwd(), options.rom);
+    const romData = fs.readFileSync(romPath);
     const kernel = new NESKernel({
         strictOpcodes: options.strictOpcodes,
     });
-    const metadata = kernel.loadROMFromFile(romPath);
+    const metadata = kernel.loadROMBuffer(romData);
     kernel.runFrames(options.frames);
     const state = kernel.getExecutionState();
 
     const summary = {
-        rom: metadata.path,
+        rom: romPath,
         format: metadata.format,
         mapper: metadata.mapperId,
         mirroring: metadata.mirroring,

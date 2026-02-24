@@ -1,21 +1,29 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { parseINESHeader } from './ines.mjs';
 import { Cartridge } from './cartridge.mjs';
 import { Bus } from './bus.mjs';
 import { CPU6502 } from './cpu6502.mjs';
 import { BUTTON_ORDER } from './controller.mjs';
 
-function toBuffer(data) {
-    if (Buffer.isBuffer(data)) {
+function toByteArray(data) {
+    if (data instanceof Uint8Array) {
         return data;
     }
 
-    if (data instanceof Uint8Array) {
-        return Buffer.from(data);
+    if (ArrayBuffer.isView(data)) {
+        return new Uint8Array(
+            data.buffer,
+            data.byteOffset,
+            data.byteLength,
+        );
     }
 
-    throw new TypeError('ROM data must be Buffer or Uint8Array.');
+    if (data instanceof ArrayBuffer) {
+        return new Uint8Array(data);
+    }
+
+    throw new TypeError(
+        'ROM data must be Uint8Array, ArrayBuffer, or TypedArray view.',
+    );
 }
 
 class NESKernel {
@@ -43,19 +51,12 @@ class NESKernel {
     }
 
     loadROMBuffer(romData) {
-        const buffer = toBuffer(romData);
-        this.romData = Buffer.from(buffer);
-        this.romMetadata = parseINESHeader(this.romData);
+        const buffer = Uint8Array.from(toByteArray(romData));
+        this.romData = buffer;
+        this.romMetadata = parseINESHeader(buffer);
         this.#bootCore();
         this.#updateStatus('ROM loaded');
         return this.getROMMetadata();
-    }
-
-    loadROMFromFile(filePath) {
-        const absolutePath = path.resolve(filePath);
-        const romData = fs.readFileSync(absolutePath);
-        this.romPath = absolutePath;
-        return this.loadROMBuffer(romData);
     }
 
     reset() {
@@ -228,7 +229,7 @@ class NESKernel {
 
     #ensureCore() {
         if (!this.cpu || !this.bus || !this.cartridge) {
-            throw new Error('No ROM loaded. Call loadROMFromFile() first.');
+            throw new Error('No ROM loaded. Call loadROMBuffer() first.');
         }
     }
 
