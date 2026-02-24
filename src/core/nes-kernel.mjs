@@ -32,9 +32,13 @@ class NESKernel {
         this.onFrame = typeof options.onFrame === 'function'
             ? options.onFrame
             : null;
+        this.onAudioSample = typeof options.onAudioSample === 'function'
+            ? options.onAudioSample
+            : null;
         this.onStatusUpdate = typeof options.onStatusUpdate === 'function'
             ? options.onStatusUpdate
             : null;
+        this.sampleRate = options.sampleRate ?? 44100;
 
         this.romPath = null;
         this.romData = null;
@@ -45,6 +49,7 @@ class NESKernel {
         this.cpu = null;
 
         this.frameCount = 0;
+        this.audioSampleCount = 0;
         this.lastFrameBuffer = null;
         this.lastFrameChecksum = null;
         this.lastStatus = null;
@@ -157,6 +162,7 @@ class NESKernel {
 
         return {
             frameCount: this.frameCount,
+            audioSampleCount: this.audioSampleCount,
             lastStatus: this.lastStatus,
             lastFrameChecksum: this.lastFrameChecksum,
             cpu: {
@@ -189,11 +195,21 @@ class NESKernel {
 
     #bootCore() {
         this.cartridge = new Cartridge(this.romData);
-        this.bus = new Bus(this.cartridge);
+        this.bus = new Bus(this.cartridge, {
+            sampleRate: this.sampleRate,
+            onAudioSample: (sample) => {
+                this.audioSampleCount += 1;
+
+                if (this.onAudioSample) {
+                    this.onAudioSample(sample, this.audioSampleCount);
+                }
+            },
+        });
         this.cpu = new CPU6502(this.bus, {
             strictOpcodes: this.options.strictOpcodes ?? false,
         });
         this.frameCount = 0;
+        this.audioSampleCount = 0;
         this.lastFrameBuffer = null;
         this.lastFrameChecksum = null;
     }

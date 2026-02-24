@@ -13,6 +13,7 @@ modern, powerful, and stable experience.
 - Deterministic save/load state support
 - Headless CLI execution for CI and regression testing
 - Minimal browser HTML GUI with Canvas rendering
+- WebAudio output path for real-time audio playback
 - Strict-opcode mode for compatibility validation
 
 ## Implemented Core Features
@@ -20,6 +21,7 @@ modern, powerful, and stable experience.
 - iNES parser and ROM loader
 - Cartridge abstraction + mapper system (`0`, `2`, `3`)
 - 6502 CPU core with mainstream instruction coverage
+- Simplified APU mixing path (pulse, triangle, noise) with sample callbacks
 - PPU pipeline with VBlank/NMI, VRAM/OAM, DMA, background/sprite rendering
 - Bus, controller ports, and memory map integration
 
@@ -69,6 +71,12 @@ Then load a `.nes` file from the GUI. Controls:
 - Start: `Enter`
 - Select: `Shift`
 
+Audio notes:
+
+- Browser autoplay restrictions apply.
+  - Click `Start` once to unlock/resume WebAudio playback.
+- If no sound is heard, verify system/browser tab is not muted.
+
 ## CLI
 
 ```bash
@@ -98,6 +106,6 @@ console.log(kernel.getExecutionState());
 ## Current Scope and Roadmap
 
 - Stabilize browser GUI and controls
-- Add WebAudio APU output path
+- Improve APU accuracy and timing behavior
 - Expand mapper coverage for broader ROM compatibility
 - Build compatibility benchmark suite and ROM matrix

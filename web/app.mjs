@@ -2,6 +2,8 @@ import { NESKernel } from '../src/index.mjs';
 
 const WIDTH = 256;
 const HEIGHT = 240;
+const AUDIO_SAMPLE_RATE = 44100;
+const AUDIO_QUEUE_CAPACITY = 262144;
 
 const romInput = document.querySelector('#romInput');
 const startBtn = document.querySelector('#startBtn');
@@ -22,6 +24,12 @@ let running = false;
 let fpsCounter = 0;
 let fpsClock = performance.now();
 let lastRomData = null;
+let audioContext = null;
+let audioNode = null;
+let audioWriteIndex = 0;
+let audioReadIndex = 0;
+let audioSize = 0;
+const audioQueue = new Float32Array(AUDIO_QUEUE_CAPACITY);
 
 const keyMap = new Map([
     ['ArrowUp', 'UP'],
@@ -40,6 +48,59 @@ const keyMap = new Map([
 
 function setError(message = '') {
     errorText.textContent = message;
+}
+
+function clearAudioQueue() {
+    audioWriteIndex = 0;
+    audioReadIndex = 0;
+    audioSize = 0;
+}
+
+function pushAudioSample(sample) {
+    if (audioSize >= AUDIO_QUEUE_CAPACITY) {
+        return;
+    }
+
+    audioQueue[audioWriteIndex] = sample;
+    audioWriteIndex = (audioWriteIndex + 1) % AUDIO_QUEUE_CAPACITY;
+    audioSize += 1;
+}
+
+function pullAudioSample() {
+    if (audioSize === 0) {
+        return 0;
+    }
+
+    const sample = audioQueue[audioReadIndex];
+    audioReadIndex = (audioReadIndex + 1) % AUDIO_QUEUE_CAPACITY;
+    audioSize -= 1;
+    return sample;
+}
+
+function ensureAudioContext() {
+    if (audioContext) {
+        return audioContext;
+    }
+
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioContextCtor) {
+        throw new Error('WebAudio is not supported in this browser.');
+    }
+
+    audioContext = new AudioContextCtor({
+        sampleRate: AUDIO_SAMPLE_RATE,
+    });
+    audioNode = audioContext.createScriptProcessor(1024, 0, 1);
+    audioNode.onaudioprocess = (event) => {
+        const output = event.outputBuffer.getChannelData(0);
+
+        for (let index = 0; index < output.length; index += 1) {
+            output[index] = pullAudioSample();
+        }
+    };
+    audioNode.connect(audioContext.destination);
+    return audioContext;
 }
 
 function updateButtons() {
@@ -119,7 +180,13 @@ function loop() {
 }
 
 function createKernel(romData, fileName) {
-    kernel = new NESKernel();
+    clearAudioQueue();
+    kernel = new NESKernel({
+        sampleRate: AUDIO_SAMPLE_RATE,
+        onAudioSample: (sample) => {
+            pushAudioSample(sample);
+        },
+    });
     const metadata = kernel.loadROMBuffer(romData);
 
     romName.textContent = fileName;
@@ -155,6 +222,13 @@ romInput.addEventListener('change', async (event) => {
 startBtn.addEventListener('click', () => {
     if (!kernel) {
         return;
+    }
+
+    try {
+        const contextForPlayback = ensureAudioContext();
+        void contextForPlayback.resume();
+    } catch (error) {
+        setError(error.message);
     }
 
     running = true;

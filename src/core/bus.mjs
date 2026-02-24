@@ -3,11 +3,14 @@ import { APU } from './apu.mjs';
 import { PPU } from './ppu.mjs';
 
 class Bus {
-    constructor(cartridge) {
+    constructor(cartridge, options = {}) {
         this.cartridge = cartridge;
         this.ram = new Uint8Array(0x0800);
         this.controllers = [new Controller(), new Controller()];
-        this.apu = new APU();
+        this.apu = new APU({
+            sampleRate: options.sampleRate,
+            onSample: options.onAudioSample,
+        });
         this.ppu = new PPU(this, cartridge);
 
         this.nmiPending = false;
