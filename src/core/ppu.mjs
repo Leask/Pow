@@ -100,9 +100,6 @@ class PPU {
             this.status &= ~(STATUS_VBLANK | STATUS_SPRITE0_HIT);
             this.status &= ~STATUS_SPRITE_OVERFLOW;
             this.frameReady = false;
-            this.scanlineScrollX.fill(this.scrollX & 0xff);
-            this.scanlineScrollY.fill(this.scrollY & 0xff);
-            this.scanlineBaseNameTable.fill(this.ctrl & 0x03);
         }
 
         this.cycle += 1;
