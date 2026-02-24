@@ -28,7 +28,8 @@ The core goals are:
 ## Current Architecture
 
 - Core emulation: `src/core/`
-  - `cpu6502.mjs`, `ppu.mjs`, `bus.mjs`, `cartridge.mjs`, `mappers/*`
+  - `cpu6502.mjs`, `ppu.mjs`, `apu.mjs`, `bus.mjs`, `cartridge.mjs`,
+    `mappers/*`
 - Public API: `src/index.mjs`
 - Node headless CLI:
   - `src/cli/run-headless.mjs`
@@ -42,6 +43,10 @@ The core goals are:
 
 - The GUI must be accessed over HTTP, not `file://`.
   - Use `npm run gui` and open `http://127.0.0.1:8184`.
+- Audio playback uses WebAudio and user-gesture unlock rules.
+  - Start audio only after user interaction (clicking `Start`).
+  - Keep audio callback flow:
+    `NESKernel(onAudioSample)` -> `Bus` -> `APU` -> GUI audio queue.
 - Background scrolling is timing-sensitive.
   - Do not reset scanline scroll buffers at pre-render.
   - SMB-style mid-frame scroll writes rely on per-scanline latching.
@@ -72,6 +77,9 @@ If you cannot run one of these checks, state it clearly.
 ## Compatibility and Scope
 
 - Implemented mappers: `0`, `2`, `3`.
+- APU is intentionally simplified right now.
+  - Prioritize stability and audible output.
+  - Do not claim cycle-accurate APU behavior unless implemented.
 - Keep changes mapper-safe unless intentionally expanding support.
 - For new mapper work, add focused tests and avoid regressions in mapper 0.
 
@@ -89,5 +97,8 @@ Keep docs aligned with actual behavior.
 
 - Ensure diff is coherent and minimal.
 - Ensure no accidental CommonJS or Node-only imports in `src/core/`.
+- If audio path was touched, verify:
+  - `test/apu.audio.test.mjs` passes.
+  - GUI still produces sound after pressing `Start`.
 - Ensure tests pass.
 - Summarize what changed, why, and residual risks.
