@@ -1,47 +1,67 @@
-# NES Emulator Core (Self-Hosted, Modern JS)
+# Pow
 
-This repository contains a self-developed NES emulator kernel in modern
-JavaScript, without external emulator packages.
+A JS NES emulator developed from scratch. It features zero external
+dependencies and utilizes the latest JS features to ensure a thoroughly
+modern, powerful, and stable experience.
 
-## Current core scope
+## Highlights
 
-- iNES ROM parsing
-- Cartridge + Mapper abstraction (`0`, `2`, `3`)
-- CPU memory bus
-- 6502 CPU core with mainstream opcode coverage
-- PPU core with VBlank/NMI timing, VRAM/OAM, and frame rendering
-- Controller input and OAM DMA
-- Save/load state snapshots
-- Headless CLI execution and automated tests
+- 100% self-hosted emulator core, no external emulator libraries
+- Modern ESM-only codebase (`.mjs`)
+- Deterministic save/load state support
+- Headless CLI execution for CI and regression testing
+- Strict-opcode mode for compatibility validation
+
+## Implemented Core Features
+
+- iNES parser and ROM loader
+- Cartridge abstraction + mapper system
+  - Mapper `0` (NROM)
+  - Mapper `2` (UxROM)
+  - Mapper `3` (CNROM)
+- 6502 CPU core with mainstream instruction coverage
+- PPU pipeline
+  - VBlank / NMI timing
+  - VRAM, OAM, and DMA behavior
+  - Background + sprite composition
+- Bus, controller ports, and memory map integration
 
 ## Requirements
 
 - Node.js 20+
 
-## Install
+## Quick Start
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-## Run smoke test with `Mario.nes`
+Run smoke execution with `Mario.nes`:
 
 ```bash
 npm run smoke
 ```
 
-## Execute tests
+Run full test suite:
 
 ```bash
 npm test
 ```
 
-## CLI options
+## CLI
 
 ```bash
 node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240
 node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240 --strict-opcodes
 ```
+
+Arguments:
+
+- `--rom <path>`: ROM file path
+- `--frames <n>`: Number of frames to execute
+- `--strict-opcodes`: Throw when unsupported opcode is encountered
 
 ## Public API
 
@@ -53,3 +73,12 @@ kernel.loadROMFromFile('./Mario.nes');
 kernel.runFrames(60);
 console.log(kernel.getExecutionState());
 ```
+
+## Current Scope and Roadmap
+
+Current focus is a stable and testable emulator kernel. Next milestones:
+
+- Web canvas renderer adapter
+- WebAudio APU output path
+- Expanded mapper coverage for broader ROM compatibility
+- Compatibility benchmark suite and ROM matrix

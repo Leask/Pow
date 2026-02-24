@@ -1,11 +1,22 @@
 {
     "name": "pow",
     "version": "1.0.0",
-    "description": "Modern minimalist self-hosted NES emulator core",
+    "description": "A JS NES emulator developed from scratch. It features zero external dependencies and utilizes the latest JS features to ensure a thoroughly modern, powerful, and stable experience.",
     "type": "module",
     "main": "src/index.mjs",
     "exports": {
         ".": "./src/index.mjs"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:Leask/Pow.git"
+    },
+    "bugs": {
+        "url": "https://github.com/Leask/Pow/issues"
+    },
+    "homepage": "https://github.com/Leask/Pow#readme",
+    "engines": {
+        "node": ">=20"
     },
     "scripts": {
         "start": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
