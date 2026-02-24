@@ -52,6 +52,9 @@ class PPU {
 
         this.scrollX = 0;
         this.scrollY = 0;
+        this.scanlineScrollX = new Uint16Array(240);
+        this.scanlineScrollY = new Uint16Array(240);
+        this.scanlineBaseNameTable = new Uint8Array(240);
 
         this.vram = new Uint8Array(0x1000);
         this.paletteRam = new Uint8Array(0x20);
@@ -72,6 +75,10 @@ class PPU {
     }
 
     #tick() {
+        if (this.scanline >= 0 && this.scanline < 240 && this.cycle === 0) {
+            this.#latchScanlineState(this.scanline);
+        }
+
         if (
             this.scanline >= 0 &&
             this.scanline < 240 &&
@@ -93,6 +100,9 @@ class PPU {
             this.status &= ~(STATUS_VBLANK | STATUS_SPRITE0_HIT);
             this.status &= ~STATUS_SPRITE_OVERFLOW;
             this.frameReady = false;
+            this.scanlineScrollX.fill(this.scrollX & 0xff);
+            this.scanlineScrollY.fill(this.scrollY & 0xff);
+            this.scanlineBaseNameTable.fill(this.ctrl & 0x03);
         }
 
         this.cycle += 1;
@@ -152,20 +162,24 @@ class PPU {
 
     #renderBackground() {
         const patternBase = (this.ctrl & CTRL_BG_PATTERN) ? 0x1000 : 0x0000;
-        const baseNameTable = this.ctrl & 0x03;
-        const baseNtX = baseNameTable & 1;
-        const baseNtY = (baseNameTable >> 1) & 1;
 
         for (let y = 0; y < 240; y += 1) {
+            const lineScrollX = this.scanlineScrollX[y] & 0x1ff;
+            const lineScrollY = this.scanlineScrollY[y] & 0xff;
+            const baseNameTable = this.scanlineBaseNameTable[y] & 0x03;
+            const baseNtX = baseNameTable & 1;
+            const baseNtY = (baseNameTable >> 1) & 1;
+
             for (let x = 0; x < 256; x += 1) {
-                const worldX = (x + this.scrollX) & 0x1ff;
-                const worldY = (y + this.scrollY) & 0x1ff;
+                const worldX = (x + lineScrollX) & 0x1ff;
+                const worldY = (y + lineScrollY) % 480;
+                const localY = worldY % 240;
                 const ntX = (baseNtX + (worldX >> 8)) & 1;
-                const ntY = (baseNtY + (worldY >> 8)) & 1;
+                const ntY = (baseNtY + Math.floor(worldY / 240)) & 1;
                 const coarseX = (worldX >> 3) & 0x1f;
-                const coarseY = (worldY >> 3) % 30;
+                const coarseY = (localY >> 3) % 30;
                 const fineX = worldX & 0x07;
-                const fineY = worldY & 0x07;
+                const fineY = localY & 0x07;
                 const nameTable = (ntY << 1) | ntX;
                 const base = 0x2000 + (nameTable * 0x0400);
                 const tileAddress = base + (coarseY * 32) + coarseX;
@@ -192,6 +206,12 @@ class PPU {
                 this.bgOpaque[offset] = pixelLow === 0 ? 0 : 1;
             }
         }
+    }
+
+    #latchScanlineState(scanline) {
+        this.scanlineScrollX[scanline] = this.scrollX & 0xff;
+        this.scanlineScrollY[scanline] = this.scrollY & 0xff;
+        this.scanlineBaseNameTable[scanline] = this.ctrl & 0x03;
     }
 
     #renderSprites() {
@@ -457,6 +477,9 @@ class PPU {
             openBus: this.openBus,
             scrollX: this.scrollX,
             scrollY: this.scrollY,
+            scanlineScrollX: Array.from(this.scanlineScrollX),
+            scanlineScrollY: Array.from(this.scanlineScrollY),
+            scanlineBaseNameTable: Array.from(this.scanlineBaseNameTable),
             vram: Array.from(this.vram),
             paletteRam: Array.from(this.paletteRam),
             oam: Array.from(this.oam),
@@ -481,6 +504,15 @@ class PPU {
         this.openBus = state.openBus;
         this.scrollX = state.scrollX;
         this.scrollY = state.scrollY;
+        if (state.scanlineScrollX) {
+            this.scanlineScrollX.set(state.scanlineScrollX);
+        }
+        if (state.scanlineScrollY) {
+            this.scanlineScrollY.set(state.scanlineScrollY);
+        }
+        if (state.scanlineBaseNameTable) {
+            this.scanlineBaseNameTable.set(state.scanlineBaseNameTable);
+        }
         this.vram.set(state.vram);
         this.paletteRam.set(state.paletteRam);
         this.oam.set(state.oam);
