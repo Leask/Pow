@@ -1,12 +1,11 @@
-'use strict';
-
-const path = require('node:path');
-const { NESKernel } = require('../core/nes-kernel');
+import path from 'node:path';
+import { NESKernel } from '../core/nes-kernel.js';
 
 function parseArgs(argv) {
     const options = {
         rom: './Mario.nes',
         frames: 120,
+        strictOpcodes: false,
     };
 
     for (let index = 0; index < argv.length; index += 1) {
@@ -21,6 +20,11 @@ function parseArgs(argv) {
         if (arg === '--frames') {
             options.frames = Number.parseInt(argv[index + 1], 10);
             index += 1;
+            continue;
+        }
+
+        if (arg === '--strict-opcodes') {
+            options.strictOpcodes = true;
             continue;
         }
 
@@ -39,9 +43,10 @@ function printHelp() {
     console.log('Usage: node src/cli/run-headless.js [options]');
     console.log('');
     console.log('Options:');
-    console.log('  --rom <path>     Path to a .nes ROM file');
-    console.log('  --frames <n>     Number of frames to run');
-    console.log('  --help, -h       Show this help');
+    console.log('  --rom <path>         Path to a .nes ROM file');
+    console.log('  --frames <n>         Number of frames to execute');
+    console.log('  --strict-opcodes     Throw on unsupported opcodes');
+    console.log('  --help, -h           Show this help');
 }
 
 function main() {
@@ -57,34 +62,34 @@ function main() {
     }
 
     const romPath = path.resolve(process.cwd(), options.rom);
-    const kernel = new NESKernel();
+    const kernel = new NESKernel({
+        strictOpcodes: options.strictOpcodes,
+    });
     const metadata = kernel.loadROMFromFile(romPath);
-    const stateBefore = kernel.getExecutionState();
     kernel.runFrames(options.frames);
-    const stateAfter = kernel.getExecutionState();
+    const state = kernel.getExecutionState();
 
     const summary = {
         rom: metadata.path,
         format: metadata.format,
-        mapper: metadata.mapper,
+        mapper: metadata.mapperId,
         mirroring: metadata.mirroring,
         prgRomBanks: metadata.prgRomBanks,
         chrRomBanks: metadata.chrRomBanks,
         requestedFrames: options.frames,
-        frameCountBefore: stateBefore.frameCount,
-        frameCountAfter: stateAfter.frameCount,
-        lastFrameChecksum: stateAfter.lastFrameChecksum,
-        cpu: stateAfter.cpu,
+        frameCount: state.frameCount,
+        lastFrameChecksum: state.lastFrameChecksum,
+        unsupportedOpcodeCount: state.unsupportedOpcodes.length,
+        cpu: state.cpu,
+        ppu: state.ppu,
     };
 
     console.log(JSON.stringify(summary, null, 4));
 }
 
-if (require.main === module) {
-    try {
-        main();
-    } catch (error) {
-        console.error(error.message);
-        process.exitCode = 1;
-    }
+try {
+    main();
+} catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
 }

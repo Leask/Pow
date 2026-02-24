@@ -1,15 +1,18 @@
-# NES Emulator Kernel (JavaScript)
+# NES Emulator Core (Self-Hosted, Modern JS)
 
-This project provides a pure JavaScript headless NES emulator kernel.
-Current stage focuses on core execution only:
+This repository contains a self-developed NES emulator kernel in modern
+JavaScript, without external emulator packages.
 
-- ROM parsing (`iNES` header)
-- Kernel lifecycle (load ROM, run frame loop)
-- Controller input API
-- Node.js smoke tests with `Mario.nes`
+## Current core scope
 
-Canvas rendering, browser controls, and audio output integration can be
-added as the next layer on top of this kernel.
+- iNES ROM parsing
+- Cartridge + Mapper abstraction (`0`, `2`, `3`)
+- CPU memory bus
+- 6502 CPU core with mainstream opcode coverage
+- PPU core with VBlank/NMI timing, VRAM/OAM, and frame rendering
+- Controller input and OAM DMA
+- Save/load state snapshots
+- Headless CLI execution and automated tests
 
 ## Requirements
 
@@ -21,28 +24,29 @@ added as the next layer on top of this kernel.
 npm install
 ```
 
-## Run headless kernel with Mario.nes
+## Run smoke test with `Mario.nes`
 
 ```bash
 npm run smoke
 ```
 
-Or run manually:
-
-```bash
-node src/cli/run-headless.js --rom ./Mario.nes --frames 120
-```
-
-## Tests
+## Execute tests
 
 ```bash
 npm test
 ```
 
+## CLI options
+
+```bash
+node src/cli/run-headless.js --rom ./Mario.nes --frames 240
+node src/cli/run-headless.js --rom ./Mario.nes --frames 240 --strict-opcodes
+```
+
 ## Public API
 
 ```js
-const { NESKernel } = require('./src');
+import { NESKernel } from './src/index.js';
 
 const kernel = new NESKernel();
 kernel.loadROMFromFile('./Mario.nes');

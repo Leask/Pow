@@ -1,10 +1,2 @@
-'use strict';
-
-const { NESKernel, BUTTONS } = require('./core/nes-kernel');
-const { parseINESHeader } = require('./core/ines');
-
-module.exports = {
-    NESKernel,
-    BUTTONS,
-    parseINESHeader,
-};
+export { NESKernel, BUTTONS } from './core/nes-kernel.js';
+export { parseINESHeader, splitINESRom } from './core/ines.js';

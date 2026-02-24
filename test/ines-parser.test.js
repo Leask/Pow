@@ -1,18 +1,16 @@
-'use strict';
-
-const path = require('node:path');
-const fs = require('node:fs');
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { parseINESHeader } = require('../src/core/ines');
+import path from 'node:path';
+import fs from 'node:fs';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { parseINESHeader } from '../src/core/ines.js';
 
 test('parses Mario.nes iNES metadata correctly', () => {
-    const romPath = path.resolve(__dirname, '..', 'Mario.nes');
+    const romPath = path.resolve(process.cwd(), 'Mario.nes');
     const romBuffer = fs.readFileSync(romPath);
     const header = parseINESHeader(romBuffer);
 
     assert.equal(header.format, 'iNES');
-    assert.equal(header.mapper, 0);
+    assert.equal(header.mapperId, 0);
     assert.equal(header.mirroring, 'vertical');
     assert.equal(header.prgRomBanks, 2);
     assert.equal(header.chrRomBanks, 1);

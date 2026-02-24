@@ -1,9 +1,9 @@
 {
     "name": "pow",
     "version": "1.0.0",
-    "description": "Headless JavaScript NES emulator core prototype",
-    "type": "commonjs",
-    "main": "src/core/nes-kernel.js",
+    "description": "Modern minimalist self-hosted NES emulator core",
+    "type": "module",
+    "main": "src/index.js",
     "scripts": {
         "start": "node src/cli/run-headless.js --rom ./Mario.nes --frames 120",
         "smoke": "node src/cli/run-headless.js --rom ./Mario.nes --frames 120",
@@ -16,8 +16,5 @@
         "headless"
     ],
     "author": "",
-    "license": "ISC",
-    "dependencies": {
-        "jsnes": "^1.2.1"
-    }
+    "license": "ISC"
 }

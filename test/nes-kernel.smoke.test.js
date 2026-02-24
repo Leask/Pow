@@ -1,16 +1,14 @@
-'use strict';
-
-const path = require('node:path');
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { NESKernel } = require('../src/core/nes-kernel');
+import path from 'node:path';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { NESKernel } from '../src/core/nes-kernel.js';
 
 test('loads Mario.nes and executes frames without crashing', () => {
-    const romPath = path.resolve(__dirname, '..', 'Mario.nes');
-    const kernel = new NESKernel({ emulateSound: false });
+    const romPath = path.resolve(process.cwd(), 'Mario.nes');
+    const kernel = new NESKernel();
     const metadata = kernel.loadROMFromFile(romPath);
 
-    assert.equal(metadata.mapper, 0);
+    assert.equal(metadata.mapperId, 0);
 
     const stateBefore = kernel.getExecutionState();
     kernel.runFrames(30);
@@ -21,11 +19,12 @@ test('loads Mario.nes and executes frames without crashing', () => {
     assert.notEqual(stateAfter.lastFrameChecksum, null);
     assert.equal(typeof stateAfter.lastFrameChecksum, 'number');
     assert.notEqual(stateAfter.cpu, null);
+    assert.equal(stateAfter.unsupportedOpcodes.length, 0);
 });
 
 test('supports basic button input calls', () => {
-    const romPath = path.resolve(__dirname, '..', 'Mario.nes');
-    const kernel = new NESKernel({ emulateSound: false });
+    const romPath = path.resolve(process.cwd(), 'Mario.nes');
+    const kernel = new NESKernel();
 
     kernel.loadROMFromFile(romPath);
     kernel.pressButton(1, 'START');
@@ -34,4 +33,21 @@ test('supports basic button input calls', () => {
     kernel.runFrames(1);
 
     assert.equal(kernel.getExecutionState().frameCount, 2);
+});
+
+test('can save and restore deterministic state', () => {
+    const romPath = path.resolve(process.cwd(), 'Mario.nes');
+    const kernel = new NESKernel();
+
+    kernel.loadROMFromFile(romPath);
+    kernel.runFrames(5);
+    const snapshot = kernel.saveState();
+    kernel.runFrames(20);
+    const checksumAfter20 = kernel.getExecutionState().lastFrameChecksum;
+
+    kernel.loadState(snapshot);
+    kernel.runFrames(20);
+    const checksumReloaded = kernel.getExecutionState().lastFrameChecksum;
+
+    assert.equal(checksumReloaded, checksumAfter20);
 });
