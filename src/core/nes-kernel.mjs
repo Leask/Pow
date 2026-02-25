@@ -3,28 +3,8 @@ import { Cartridge } from './cartridge.mjs';
 import { Bus } from './bus.mjs';
 import { CPU6502 } from './cpu6502.mjs';
 import { BUTTON_ORDER } from './controller.mjs';
-
-function toByteArray(data) {
-    if (data instanceof Uint8Array) {
-        return data;
-    }
-
-    if (ArrayBuffer.isView(data)) {
-        return new Uint8Array(
-            data.buffer,
-            data.byteOffset,
-            data.byteLength,
-        );
-    }
-
-    if (data instanceof ArrayBuffer) {
-        return new Uint8Array(data);
-    }
-
-    throw new TypeError(
-        'ROM data must be Uint8Array, ArrayBuffer, or TypedArray view.',
-    );
-}
+import { toByteArray } from '../shared/nintendo/rom-buffer.mjs';
+import { checksum32 } from '../shared/nintendo/checksum.mjs';
 
 class NESKernel {
     constructor(options = {}) {
@@ -94,7 +74,7 @@ class NESKernel {
 
         this.frameCount = this.bus.ppu.frame;
         this.lastFrameBuffer = Uint32Array.from(this.bus.ppu.frameBuffer);
-        this.lastFrameChecksum = this.#checksum(this.lastFrameBuffer);
+        this.lastFrameChecksum = checksum32(this.lastFrameBuffer);
 
         if (this.onFrame) {
             this.onFrame(this.lastFrameBuffer, this.frameCount);
@@ -152,7 +132,12 @@ class NESKernel {
 
         return {
             ...this.romMetadata,
+            system: 'nes',
             path: this.romPath,
+            screen: {
+                width: 256,
+                height: 240,
+            },
         };
     }
 
@@ -212,16 +197,6 @@ class NESKernel {
         this.audioSampleCount = 0;
         this.lastFrameBuffer = null;
         this.lastFrameChecksum = null;
-    }
-
-    #checksum(frameBuffer) {
-        let sum = 0 >>> 0;
-
-        for (const pixel of frameBuffer) {
-            sum = (sum + (pixel >>> 0)) >>> 0;
-        }
-
-        return sum >>> 0;
     }
 
     #setButton(player, buttonName, pressed) {

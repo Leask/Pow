@@ -1,7 +1,7 @@
-import { NESKernel } from '../src/index.mjs';
+import { createNintendoKernelFromROM } from '../src/index.mjs';
 
-const WIDTH = 256;
-const HEIGHT = 240;
+const DEFAULT_WIDTH = 256;
+const DEFAULT_HEIGHT = 240;
 const AUDIO_SAMPLE_RATE = 44100;
 const AUDIO_QUEUE_CAPACITY = 262144;
 
@@ -17,13 +17,18 @@ const mapperText = document.querySelector('#mapper');
 const errorText = document.querySelector('#errorText');
 const canvas = document.querySelector('#screen');
 const context = canvas.getContext('2d', { alpha: false });
-const imageData = context.createImageData(WIDTH, HEIGHT);
+
+let frameWidth = DEFAULT_WIDTH;
+let frameHeight = DEFAULT_HEIGHT;
+let imageData = context.createImageData(frameWidth, frameHeight);
 
 let kernel = null;
 let running = false;
+let currentSystem = null;
 let fpsCounter = 0;
 let fpsClock = performance.now();
 let lastRomData = null;
+let lastRomName = '';
 let audioContext = null;
 let audioNode = null;
 let audioWriteIndex = 0;
@@ -42,6 +47,10 @@ const keyMap = new Map([
     ['d', 'RIGHT'],
     ['j', 'A'],
     ['k', 'B'],
+    ['u', 'X'],
+    ['i', 'Y'],
+    ['q', 'L'],
+    ['e', 'R'],
     ['Enter', 'START'],
     ['Shift', 'SELECT'],
 ]);
@@ -103,6 +112,44 @@ function ensureAudioContext() {
     return audioContext;
 }
 
+function ensureImageBuffer(width, height) {
+    const safeWidth = Number.isInteger(width) && width > 0
+        ? width
+        : DEFAULT_WIDTH;
+    const safeHeight = Number.isInteger(height) && height > 0
+        ? height
+        : DEFAULT_HEIGHT;
+
+    if (safeWidth === frameWidth && safeHeight === frameHeight) {
+        return;
+    }
+
+    frameWidth = safeWidth;
+    frameHeight = safeHeight;
+    canvas.width = frameWidth;
+    canvas.height = frameHeight;
+    imageData = context.createImageData(frameWidth, frameHeight);
+}
+
+function formatMapper(metadata) {
+    if (!metadata) {
+        return '-';
+    }
+
+    if (currentSystem === 'nes') {
+        return String(metadata.mapperId);
+    }
+
+    if (currentSystem === 'snes') {
+        const mapMode = Number(metadata.mapMode ?? 0)
+            .toString(16)
+            .padStart(2, '0');
+        return `${metadata.layout} / 0x${mapMode}`;
+    }
+
+    return '-';
+}
+
 function updateButtons() {
     const loaded = kernel !== null;
 
@@ -123,11 +170,11 @@ function updateStatus() {
     const metadata = kernel.getROMMetadata();
 
     frameCount.textContent = String(state.frameCount);
-    mapperText.textContent = String(metadata.mapperId);
+    mapperText.textContent = formatMapper(metadata);
 }
 
 function drawFrame(frame) {
-    if (!frame) {
+    if (!frame || frame.length !== frameWidth * frameHeight) {
         return;
     }
 
@@ -181,22 +228,58 @@ function loop() {
 
 function createKernel(romData, fileName) {
     clearAudioQueue();
-    kernel = new NESKernel({
+
+    const selected = createNintendoKernelFromROM(romData, {
         sampleRate: AUDIO_SAMPLE_RATE,
         onAudioSample: (sample) => {
             pushAudioSample(sample);
         },
     });
-    const metadata = kernel.loadROMBuffer(romData);
 
-    romName.textContent = fileName;
-    mapperText.textContent = String(metadata.mapperId);
+    kernel = selected.kernel;
+    currentSystem = selected.system;
+    const metadata = kernel.loadROMBuffer(romData);
+    const screen = metadata.screen ?? {
+        width: DEFAULT_WIDTH,
+        height: currentSystem === 'snes' ? 224 : 240,
+    };
+
+    ensureImageBuffer(screen.width, screen.height);
+
+    romName.textContent = `${fileName} (${currentSystem.toUpperCase()})`;
+    mapperText.textContent = formatMapper(metadata);
     fpsText.textContent = '0';
     fpsCounter = 0;
     fpsClock = performance.now();
 
     runOneFrame();
     updateButtons();
+}
+
+function handleButtonEvent(event, pressed) {
+    if (!kernel) {
+        return;
+    }
+
+    const button = keyMap.get(event.key) || keyMap.get(event.key.toLowerCase());
+
+    if (!button) {
+        return;
+    }
+
+    event.preventDefault();
+
+    try {
+        if (pressed) {
+            kernel.pressButton(1, button);
+        } else {
+            kernel.releaseButton(1, button);
+        }
+    } catch (error) {
+        if (!(error instanceof RangeError)) {
+            setError(error.message);
+        }
+    }
 }
 
 romInput.addEventListener('change', async (event) => {
@@ -213,6 +296,7 @@ romInput.addEventListener('change', async (event) => {
 
         const arrayBuffer = await file.arrayBuffer();
         lastRomData = new Uint8Array(arrayBuffer);
+        lastRomName = file.name;
         createKernel(lastRomData, file.name);
     } catch (error) {
         setError(error.message);
@@ -248,7 +332,7 @@ resetBtn.addEventListener('click', () => {
 
     try {
         running = false;
-        createKernel(lastRomData, romName.textContent);
+        createKernel(lastRomData, lastRomName);
         setError('');
     } catch (error) {
         setError(error.message);
@@ -265,36 +349,14 @@ stepBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (event) => {
-    if (!kernel) {
-        return;
-    }
-
-    const button = keyMap.get(event.key) || keyMap.get(event.key.toLowerCase());
-
-    if (!button) {
-        return;
-    }
-
-    event.preventDefault();
-    kernel.pressButton(1, button);
+    handleButtonEvent(event, true);
 });
 
 window.addEventListener('keyup', (event) => {
-    if (!kernel) {
-        return;
-    }
-
-    const button = keyMap.get(event.key) || keyMap.get(event.key.toLowerCase());
-
-    if (!button) {
-        return;
-    }
-
-    event.preventDefault();
-    kernel.releaseButton(1, button);
+    handleButtonEvent(event, false);
 });
 
 context.fillStyle = '#000000';
-context.fillRect(0, 0, WIDTH, HEIGHT);
+context.fillRect(0, 0, frameWidth, frameHeight);
 updateButtons();
 loop();

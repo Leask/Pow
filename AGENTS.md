@@ -5,10 +5,11 @@ Read it before making changes.
 
 ## Project Mission
 
-`Pow` is a modern NES emulator in JavaScript, built from scratch.
+`Pow` is a modern Nintendo emulator in JavaScript, built from scratch.
 The core goals are:
 
 - Correct emulation behavior for real ROMs.
+- Keep NES and SNES as separate kernels with clean boundaries.
 - Zero external emulator dependencies.
 - Clean, maintainable, testable architecture.
 - Shared core that works in both Node.js and browser environments.
@@ -17,6 +18,8 @@ The core goals are:
 
 - Keep the emulator core self-hosted.
   - Do not add third-party emulator cores.
+- Do not merge NES and SNES kernels into one monolith.
+  - Shared logic belongs in `src/shared/nintendo/*`.
 - Keep runtime dependencies at zero unless explicitly requested.
 - Keep the codebase ESM-only.
   - Use `.mjs` files.
@@ -27,9 +30,16 @@ The core goals are:
 
 ## Current Architecture
 
+- Shared Nintendo utilities: `src/shared/nintendo/`
+  - ROM buffer helpers, checksum helpers, system constants
 - Core emulation: `src/core/`
-  - `cpu6502.mjs`, `ppu.mjs`, `apu.mjs`, `bus.mjs`, `cartridge.mjs`,
-    `mappers/*`
+  - NES kernel + components:
+    `cpu6502.mjs`, `ppu.mjs`, `apu.mjs`, `bus.mjs`, `cartridge.mjs`,
+    `mappers/*`, `nes-kernel.mjs`, `ines.mjs`
+  - SNES kernel + components:
+    `snes/snes-kernel.mjs`, `snes/smc.mjs`
+  - Multi-system orchestration:
+    `system-detect.mjs`, `emulator-factory.mjs`
 - Public API: `src/index.mjs`
 - Node headless CLI:
   - `src/cli/run-headless.mjs`
@@ -45,8 +55,8 @@ The core goals are:
   - Use `npm run gui` and open `http://127.0.0.1:8184`.
 - Audio playback uses WebAudio and user-gesture unlock rules.
   - Start audio only after user interaction (clicking `Start`).
-  - Keep audio callback flow:
-    `NESKernel(onAudioSample)` -> `Bus` -> `APU` -> GUI audio queue.
+  - Keep audio callback flow for active systems:
+    `Kernel(onAudioSample)` -> system audio path -> GUI audio queue.
 - Background scrolling is timing-sensitive.
   - Do not reset scanline scroll buffers at pre-render.
   - SMB-style mid-frame scroll writes rely on per-scanline latching.
@@ -67,9 +77,11 @@ After code changes, run all relevant checks:
 
 1. `npm test`
 2. `npm run smoke`
-3. If GUI-affecting changes:
+3. `npm run smoke:snes`
+4. If GUI-affecting changes:
    - `npm run gui`
    - Verify `GET /` and `GET /web/app.mjs` return `200`.
+   - Verify `GET /src/index.mjs` returns `200`.
    - Manual ROM load sanity check in browser.
 
 If you cannot run one of these checks, state it clearly.
@@ -77,9 +89,12 @@ If you cannot run one of these checks, state it clearly.
 ## Compatibility and Scope
 
 - Implemented mappers: `0`, `2`, `3`.
+- Systems currently wired in the app layer: `NES`, `SNES`.
 - APU is intentionally simplified right now.
   - Prioritize stability and audible output.
   - Do not claim cycle-accurate APU behavior unless implemented.
+- SNES kernel is currently a scaffold for system-level plumbing.
+  - Do not claim cycle-accurate SNES emulation until CPU/PPU/APU are real.
 - Keep changes mapper-safe unless intentionally expanding support.
 - For new mapper work, add focused tests and avoid regressions in mapper 0.
 

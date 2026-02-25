@@ -1,31 +1,11 @@
+import { toByteArray } from '../shared/nintendo/rom-buffer.mjs';
+
 const NES_MAGIC = [0x4e, 0x45, 0x53, 0x1a];
 const HEADER_SIZE = 16;
 const TRAINER_SIZE = 512;
 const PRG_ROM_BANK_SIZE = 16 * 1024;
 const CHR_ROM_BANK_SIZE = 8 * 1024;
 const PRG_RAM_BANK_SIZE = 8 * 1024;
-
-function toByteArray(data) {
-    if (data instanceof Uint8Array) {
-        return data;
-    }
-
-    if (ArrayBuffer.isView(data)) {
-        return new Uint8Array(
-            data.buffer,
-            data.byteOffset,
-            data.byteLength,
-        );
-    }
-
-    if (data instanceof ArrayBuffer) {
-        return new Uint8Array(data);
-    }
-
-    throw new TypeError(
-        'ROM data must be Uint8Array, ArrayBuffer, or TypedArray view.',
-    );
-}
 
 function parseINESHeader(data) {
     const rom = toByteArray(data);

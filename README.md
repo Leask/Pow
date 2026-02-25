@@ -10,6 +10,8 @@ modern, powerful, and stable experience.
 
 - 100% self-hosted emulator core, no external emulator libraries
 - Modern ESM-only codebase (`.mjs`)
+- Multi-system architecture with separate NES and SNES kernels
+- Shared Nintendo library for cross-kernel utilities
 - Deterministic save/load state support
 - Headless CLI execution for CI and regression testing
 - Minimal browser HTML GUI with Canvas rendering
@@ -19,11 +21,14 @@ modern, powerful, and stable experience.
 ## Implemented Core Features
 
 - iNES parser and ROM loader
+- SNES (`.smc/.sfc`) header parser and loader
 - Cartridge abstraction + mapper system (`0`, `2`, `3`)
 - 6502 CPU core with mainstream instruction coverage
 - Simplified APU mixing path (pulse, triangle, noise) with sample callbacks
 - PPU pipeline with VBlank/NMI, VRAM/OAM, DMA, background/sprite rendering
+- SNES kernel scaffold with deterministic frame execution loop
 - Bus, controller ports, and memory map integration
+- ROM format detection + kernel factory (`NES` / `SNES`)
 
 ## Requirements
 
@@ -63,13 +68,14 @@ Open:
 http://127.0.0.1:8184
 ```
 
-Then load a `.nes` file from the GUI. Controls:
+Then load a `.nes/.smc/.sfc` file from the GUI. Controls:
 
 - Keyboard: Arrow keys / WASD
 - A: `J`
 - B: `K`
 - Start: `Enter`
 - Select: `Shift`
+- SNES extra buttons: `U=X`, `I=Y`, `Q=L`, `E=R`
 
 Audio notes:
 
@@ -82,22 +88,27 @@ Audio notes:
 ```bash
 node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240
 node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240 --strict-opcodes
+node src/cli/run-headless.mjs --rom "./Mario World.smc" --frames 120
 ```
 
 Arguments:
 
 - `--rom <path>`: ROM file path
+- `--system <nes|snes>`: Optional manual system override
 - `--frames <n>`: Number of frames to execute
-- `--strict-opcodes`: Throw when unsupported opcode is encountered
+- `--strict-opcodes`: Throw when unsupported opcode is encountered (NES)
 
 ## Public API (Node)
 
 ```js
 import fs from 'node:fs';
-import { NESKernel } from './src/index.mjs';
+import {
+    createNintendoKernelFromROM,
+} from './src/index.mjs';
 
 const romData = fs.readFileSync('./Mario.nes');
-const kernel = new NESKernel();
+const { system, kernel } = createNintendoKernelFromROM(romData);
+console.log('Detected system:', system);
 kernel.loadROMBuffer(romData);
 kernel.runFrames(60);
 console.log(kernel.getExecutionState());
@@ -105,7 +116,8 @@ console.log(kernel.getExecutionState());
 
 ## Current Scope and Roadmap
 
-- Stabilize browser GUI and controls
+- Stabilize NES and SNES browser GUI behavior and controls
 - Improve APU accuracy and timing behavior
+- Implement real SNES CPU/PPU/APU execution path
 - Expand mapper coverage for broader ROM compatibility
 - Build compatibility benchmark suite and ROM matrix

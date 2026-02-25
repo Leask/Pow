@@ -21,6 +21,7 @@
     "scripts": {
         "start": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
         "smoke": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
+        "smoke:snes": "node src/cli/run-headless.mjs --rom \"./Mario World.smc\" --frames 60",
         "test": "node --test",
         "gui": "PORT=8184 node src/cli/serve-gui.mjs"
     },
