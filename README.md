@@ -1,6 +1,6 @@
 # 🎮 Pow
 
-A JS Nintendo emulator developed from scratch. It features zero external
+A JS NES/SNES emulator developed from scratch. It features zero external
 dependencies and utilizes the latest JS features to ensure a thoroughly
 modern, powerful, and stable experience.
 
@@ -54,6 +54,12 @@ Run smoke execution with `Mario.nes`:
 
 ```bash
 npm run smoke
+```
+
+Run SNES smoke execution with `Mario World.smc`:
+
+```bash
+npm run smoke:snes
 ```
 
 Run test suite:
