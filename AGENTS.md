@@ -37,7 +37,9 @@ The core goals are:
     `cpu6502.mjs`, `ppu.mjs`, `apu.mjs`, `bus.mjs`, `cartridge.mjs`,
     `mappers/*`, `nes-kernel.mjs`, `ines.mjs`
   - SNES kernel + components:
-    `snes/snes-kernel.mjs`, `snes/smc.mjs`
+    `snes/snes-kernel.mjs`, `snes/smc.mjs`, `snes/cartridge.mjs`,
+    `snes/bus.mjs`, `snes/cpu65816.mjs`, `snes/ppu.mjs`,
+    `snes/controller.mjs`
   - Multi-system orchestration:
     `system-detect.mjs`, `emulator-factory.mjs`
 - Public API: `src/index.mjs`
@@ -93,8 +95,10 @@ If you cannot run one of these checks, state it clearly.
 - APU is intentionally simplified right now.
   - Prioritize stability and audible output.
   - Do not claim cycle-accurate APU behavior unless implemented.
-- SNES kernel is currently a scaffold for system-level plumbing.
-  - Do not claim cycle-accurate SNES emulation until CPU/PPU/APU are real.
+- SNES currently has real execution plumbing (LoROM + 65C816 subset +
+  DMA + VBlank/NMI + BG1 render path), but is still not cycle-accurate.
+  - Do not claim full/playable SNES compatibility until sprites, windows,
+    HDMA edge cases, and APU audio are completed.
 - Keep changes mapper-safe unless intentionally expanding support.
 - For new mapper work, add focused tests and avoid regressions in mapper 0.
 

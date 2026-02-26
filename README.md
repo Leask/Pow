@@ -1,6 +1,6 @@
 # 🎮 Pow
 
-A JS NES emulator developed from scratch. It features zero external
+A JS Nintendo emulator developed from scratch. It features zero external
 dependencies and utilizes the latest JS features to ensure a thoroughly
 modern, powerful, and stable experience.
 
@@ -26,7 +26,9 @@ modern, powerful, and stable experience.
 - 6502 CPU core with mainstream instruction coverage
 - Simplified APU mixing path (pulse, triangle, noise) with sample callbacks
 - PPU pipeline with VBlank/NMI, VRAM/OAM, DMA, background/sprite rendering
-- SNES kernel scaffold with deterministic frame execution loop
+- SNES LoROM bus + 65C816 CPU subset (strict-opcode tested on `Mario World.smc`)
+- SNES DMA path, APU I/O boot handshake emulation, VBlank/NMI timing
+- SNES PPU BG1/CGRAM/VRAM rendering path for GUI output
 - Bus, controller ports, and memory map integration
 - ROM format detection + kernel factory (`NES` / `SNES`)
 
@@ -88,7 +90,7 @@ Audio notes:
 ```bash
 node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240
 node src/cli/run-headless.mjs --rom ./Mario.nes --frames 240 --strict-opcodes
-node src/cli/run-headless.mjs --rom "./Mario World.smc" --frames 120
+node src/cli/run-headless.mjs --rom "./Mario World.smc" --frames 240 --strict-opcodes
 ```
 
 Arguments:
@@ -96,7 +98,7 @@ Arguments:
 - `--rom <path>`: ROM file path
 - `--system <nes|snes>`: Optional manual system override
 - `--frames <n>`: Number of frames to execute
-- `--strict-opcodes`: Throw when unsupported opcode is encountered (NES)
+- `--strict-opcodes`: Throw when unsupported opcode is encountered
 
 ## Public API (Node)
 
@@ -118,6 +120,7 @@ console.log(kernel.getExecutionState());
 
 - Stabilize NES and SNES browser GUI behavior and controls
 - Improve APU accuracy and timing behavior
-- Implement real SNES CPU/PPU/APU execution path
+- Expand SNES instruction coverage and PPU features (sprites/window/HDMA)
+- Implement SNES APU audio path
 - Expand mapper coverage for broader ROM compatibility
 - Build compatibility benchmark suite and ROM matrix

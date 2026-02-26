@@ -1,34 +1,10 @@
 import { checksum32 } from '../../shared/nintendo/checksum.mjs';
 import { toByteArray } from '../../shared/nintendo/rom-buffer.mjs';
-import { parseSNESHeader } from './smc.mjs';
-
-const SNES_WIDTH = 256;
-const SNES_HEIGHT = 224;
-const SNES_MASTER_CYCLES_PER_FRAME = 357_366;
-
-const SNES_BUTTON_ORDER = Object.freeze([
-    'B',
-    'Y',
-    'SELECT',
-    'START',
-    'UP',
-    'DOWN',
-    'LEFT',
-    'RIGHT',
-    'A',
-    'X',
-    'L',
-    'R',
-]);
-
-function packColor(red, green, blue, alpha = 0xff) {
-    return (
-        ((alpha & 0xff) << 24) |
-        ((red & 0xff) << 16) |
-        ((green & 0xff) << 8) |
-        (blue & 0xff)
-    ) >>> 0;
-}
+import { SNESCartridge } from './cartridge.mjs';
+import { SNESBus } from './bus.mjs';
+import { CPU65816 } from './cpu65816.mjs';
+import { SNES_BUTTON_ORDER } from './controller.mjs';
+import { SNES_WIDTH, SNES_HEIGHT } from './ppu.mjs';
 
 class SNESKernel {
     constructor(options = {}) {
@@ -43,39 +19,52 @@ class SNESKernel {
             ? options.onStatusUpdate
             : null;
 
+        this.strictOpcodes = options.strictOpcodes ?? false;
+
         this.romPath = null;
         this.romData = null;
-        this.romMetadata = null;
+
+        this.cartridge = null;
+        this.bus = null;
+        this.cpu = null;
 
         this.frameCount = 0;
         this.audioSampleCount = 0;
-        this.totalMasterCycles = 0;
         this.lastFrameBuffer = null;
         this.lastFrameChecksum = null;
         this.lastStatus = null;
-
-        this.controllers = [new Set(), new Set()];
     }
 
     loadROMBuffer(romData) {
-        const buffer = Uint8Array.from(toByteArray(romData));
-        this.romData = buffer;
-        this.romMetadata = parseSNESHeader(buffer);
+        this.romData = Uint8Array.from(toByteArray(romData));
         this.#bootCore();
         this.#updateStatus('ROM loaded');
         return this.getROMMetadata();
     }
 
     reset() {
-        this.#ensureLoaded();
+        this.#ensureCore();
         this.#bootCore();
     }
 
     runFrame() {
-        this.#ensureLoaded();
-        this.totalMasterCycles += SNES_MASTER_CYCLES_PER_FRAME;
-        this.frameCount += 1;
-        this.lastFrameBuffer = this.#renderFrame();
+        this.#ensureCore();
+        const targetFrame = this.bus.ppu.frame + 1;
+        let guard = 8_000_000;
+
+        while (this.bus.ppu.frame < targetFrame) {
+            const cycles = this.cpu.step();
+            this.bus.clock(cycles);
+
+            guard -= 1;
+
+            if (guard === 0) {
+                throw new Error('SNES frame execution guard exceeded.');
+            }
+        }
+
+        this.frameCount = this.bus.ppu.frame;
+        this.lastFrameBuffer = Uint32Array.from(this.bus.ppu.frameBuffer);
         this.lastFrameChecksum = checksum32(this.lastFrameBuffer);
 
         if (this.onFrame) {
@@ -86,7 +75,7 @@ class SNESKernel {
     }
 
     runFrames(frameCount) {
-        this.#ensureLoaded();
+        this.#ensureCore();
 
         if (!Number.isInteger(frameCount) || frameCount <= 0) {
             throw new RangeError('frameCount must be a positive integer.');
@@ -108,48 +97,36 @@ class SNESKernel {
     }
 
     saveState() {
-        this.#ensureLoaded();
+        this.#ensureCore();
 
         return {
             frameCount: this.frameCount,
             audioSampleCount: this.audioSampleCount,
-            totalMasterCycles: this.totalMasterCycles,
             lastFrameChecksum: this.lastFrameChecksum,
-            controllers: this.controllers.map((buttons) =>
-                Array.from(buttons.values()),
-            ),
+            cartridge: this.cartridge.saveState(),
+            bus: this.bus.saveState(),
+            cpu: this.cpu.saveState(),
         };
     }
 
     loadState(state) {
-        this.#ensureLoaded();
+        this.#ensureCore();
+        this.cartridge.loadState(state.cartridge);
+        this.bus.loadState(state.bus);
+        this.cpu.loadState(state.cpu);
         this.frameCount = state.frameCount >>> 0;
         this.audioSampleCount = state.audioSampleCount >>> 0;
-        this.totalMasterCycles = state.totalMasterCycles >>> 0;
         this.lastFrameChecksum = state.lastFrameChecksum;
-
-        this.controllers = [new Set(), new Set()];
-
-        for (let index = 0; index < this.controllers.length; index += 1) {
-            const buttonList = state.controllers?.[index] ?? [];
-
-            for (const name of buttonList) {
-                const normalized = String(name).trim().toUpperCase();
-
-                if (SNES_BUTTON_ORDER.includes(normalized)) {
-                    this.controllers[index].add(normalized);
-                }
-            }
-        }
+        this.lastFrameBuffer = Uint32Array.from(this.bus.ppu.frameBuffer);
     }
 
     getROMMetadata() {
-        if (!this.romMetadata) {
+        if (!this.cartridge) {
             return null;
         }
 
         return {
-            ...this.romMetadata,
+            ...this.cartridge.header,
             path: this.romPath,
             screen: {
                 width: SNES_WIDTH,
@@ -159,7 +136,7 @@ class SNESKernel {
     }
 
     getExecutionState() {
-        this.#ensureLoaded();
+        this.#ensureCore();
 
         return {
             system: 'snes',
@@ -168,89 +145,57 @@ class SNESKernel {
             lastStatus: this.lastStatus,
             lastFrameChecksum: this.lastFrameChecksum,
             cpu: {
-                pc: this.romMetadata.nativeResetVector,
-                sp: 0,
-                acc: 0,
-                x: 0,
-                y: 0,
-                status: 0,
-                totalCycles: this.totalMasterCycles,
+                pc: this.cpu.PC,
+                pb: this.cpu.PBR,
+                sp: this.cpu.SP,
+                dp: this.cpu.D,
+                db: this.cpu.DBR,
+                acc: this.cpu.A,
+                x: this.cpu.X,
+                y: this.cpu.Y,
+                status: this.cpu.P,
+                emulation: this.cpu.E ? 1 : 0,
+                totalCycles: this.cpu.totalCycles,
             },
             ppu: {
-                scanline: 0,
-                cycle: 0,
-                frame: this.frameCount,
+                scanline: this.bus.ppu.scanline,
+                cycle: this.bus.ppu.cycle,
+                frame: this.bus.ppu.frame,
                 width: SNES_WIDTH,
                 height: SNES_HEIGHT,
             },
-            unsupportedOpcodes: [],
+            unsupportedOpcodes: Array.from(this.cpu.unknownOpcodes.entries())
+                .map(([opcode, count]) => ({
+                    opcode,
+                    count,
+                })),
         };
     }
 
     #bootCore() {
+        this.cartridge = new SNESCartridge(this.romData);
+        this.bus = new SNESBus(this.cartridge);
+        this.cpu = new CPU65816(this.bus, {
+            strictOpcodes: this.strictOpcodes,
+        });
         this.frameCount = 0;
         this.audioSampleCount = 0;
-        this.totalMasterCycles = 0;
         this.lastFrameBuffer = null;
         this.lastFrameChecksum = null;
-        this.controllers = [new Set(), new Set()];
     }
 
     #setButton(player, buttonName, pressed) {
-        this.#ensureLoaded();
+        this.#ensureCore();
 
         if (!Number.isInteger(player) || player < 1 || player > 2) {
             throw new RangeError('player must be 1 or 2.');
         }
 
-        const normalized = String(buttonName).trim().toUpperCase();
-
-        if (!SNES_BUTTON_ORDER.includes(normalized)) {
-            throw new RangeError(
-                `Unsupported button "${buttonName}". ` +
-                `Use: ${SNES_BUTTON_ORDER.join(', ')}`,
-            );
-        }
-
-        const controller = this.controllers[player - 1];
-
-        if (pressed) {
-            controller.add(normalized);
-        } else {
-            controller.delete(normalized);
-        }
+        this.bus.controllers[player - 1].setButton(buttonName, pressed);
     }
 
-    #renderFrame() {
-        const frame = new Uint32Array(SNES_WIDTH * SNES_HEIGHT);
-        const romLength = this.romData.length;
-        const frameSeed = this.frameCount * 73;
-
-        for (let y = 0; y < SNES_HEIGHT; y += 1) {
-            const rowOffset = y * SNES_WIDTH;
-            const colorSeed = (frameSeed + y * 17) % romLength;
-            const base = this.romData[colorSeed];
-            const accent = this.romData[(colorSeed + 97) % romLength];
-            const rowColor = packColor(
-                base,
-                (base + accent) & 0xff,
-                accent,
-            );
-
-            for (let x = 0; x < SNES_WIDTH; x += 1) {
-                const blink = ((x + frameSeed) & 0x10) === 0 ? 0 : 16;
-                const red = ((rowColor >>> 16) & 0xff) ^ blink;
-                const green = ((rowColor >>> 8) & 0xff) ^ (blink >> 1);
-                const blue = (rowColor & 0xff) ^ (blink >> 2);
-                frame[rowOffset + x] = packColor(red, green, blue);
-            }
-        }
-
-        return frame;
-    }
-
-    #ensureLoaded() {
-        if (!this.romData || !this.romMetadata) {
+    #ensureCore() {
+        if (!this.cpu || !this.bus || !this.cartridge) {
             throw new Error('No ROM loaded. Call loadROMBuffer() first.');
         }
     }
