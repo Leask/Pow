@@ -6,6 +6,8 @@ modern, powerful, and stable experience.
 
 <img width="1002" height="947" alt="Screenshot 2026-02-24 at 1 20 54 PM" src="https://github.com/user-attachments/assets/4eaa2055-bc47-4b12-a268-aa794195d9d1" />
 
+<img width="1016" height="897" alt="Screenshot 2026-02-26 at 1 17 46 AM" src="https://github.com/user-attachments/assets/48170135-5b50-4c09-8e2c-c9aa0f133895" />
+
 ## Highlights
 
 - 100% self-hosted emulator core, no external emulator libraries
