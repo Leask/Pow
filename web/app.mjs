@@ -2,8 +2,11 @@ import { createNintendoKernelFromROM } from '../src/index.mjs';
 
 const DEFAULT_WIDTH = 256;
 const DEFAULT_HEIGHT = 240;
-const AUDIO_SAMPLE_RATE = 44100;
+const AUDIO_SAMPLE_RATE = 44_100;
 const AUDIO_QUEUE_CAPACITY = 262144;
+const AUDIO_WARMUP_MS = 120;
+const AUDIO_LOW_WATER_MS = 50;
+const AUDIO_CATCHUP_MAX_FRAMES = 8;
 
 const romInput = document.querySelector('#romInput');
 const startBtn = document.querySelector('#startBtn');
@@ -34,6 +37,8 @@ let audioNode = null;
 let audioWriteIndex = 0;
 let audioReadIndex = 0;
 let audioSize = 0;
+let kernelSampleRate = AUDIO_SAMPLE_RATE;
+let hasStartedPlayback = false;
 const audioQueue = new Float32Array(AUDIO_QUEUE_CAPACITY);
 
 const keyMap = new Map([
@@ -110,6 +115,25 @@ function ensureAudioContext() {
     };
     audioNode.connect(audioContext.destination);
     return audioContext;
+}
+
+function getAudioSampleRate() {
+    if (audioContext) {
+        return Math.round(audioContext.sampleRate);
+    }
+
+    return kernelSampleRate;
+}
+
+function getAudioQueueTargetSize(milliseconds) {
+    const samples = Math.round((getAudioSampleRate() * milliseconds) / 1000);
+    const safeSamples = Number.isFinite(samples) && samples > 0
+        ? samples
+        : 2048;
+    return Math.min(
+        AUDIO_QUEUE_CAPACITY - 1024,
+        Math.max(2048, safeSamples),
+    );
 }
 
 function ensureImageBuffer(width, height) {
@@ -212,10 +236,36 @@ function runOneFrame() {
     }
 }
 
+function topOffAudioQueue(targetSize) {
+    if (!kernel || !audioContext || audioContext.state !== 'running') {
+        return 0;
+    }
+
+    let framesAdvanced = 0;
+
+    while (
+        audioSize < targetSize &&
+        framesAdvanced < AUDIO_CATCHUP_MAX_FRAMES
+    ) {
+        kernel.runFrame();
+        framesAdvanced += 1;
+    }
+
+    return framesAdvanced;
+}
+
 function loop() {
     if (running) {
         try {
             runOneFrame();
+            const catchupFrames = topOffAudioQueue(
+                getAudioQueueTargetSize(AUDIO_LOW_WATER_MS),
+            );
+
+            if (catchupFrames > 0) {
+                drawFrame(kernel.lastFrameBuffer);
+                updateStatus();
+            }
         } catch (error) {
             running = false;
             updateButtons();
@@ -226,11 +276,18 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-function createKernel(romData, fileName) {
+function createKernel(romData, fileName, sampleRate = getAudioSampleRate()) {
+    const normalizedSampleRate = Number.isFinite(sampleRate) &&
+        sampleRate >= 8_000
+        ? Math.round(sampleRate)
+        : AUDIO_SAMPLE_RATE;
+
+    kernelSampleRate = normalizedSampleRate;
+    hasStartedPlayback = false;
     clearAudioQueue();
 
     const selected = createNintendoKernelFromROM(romData, {
-        sampleRate: AUDIO_SAMPLE_RATE,
+        sampleRate: normalizedSampleRate,
         onAudioSample: (sample) => {
             pushAudioSample(sample);
         },
@@ -303,21 +360,41 @@ romInput.addEventListener('change', async (event) => {
     }
 });
 
-startBtn.addEventListener('click', () => {
+startBtn.addEventListener('click', async () => {
     if (!kernel) {
         return;
     }
 
     try {
         const contextForPlayback = ensureAudioContext();
-        void contextForPlayback.resume();
+        await contextForPlayback.resume();
+
+        if (!hasStartedPlayback && lastRomData) {
+            const outputSampleRate = Math.round(
+                contextForPlayback.sampleRate,
+            );
+
+            if (Math.abs(kernelSampleRate - outputSampleRate) > 1) {
+                createKernel(lastRomData, lastRomName, outputSampleRate);
+            }
+
+            const warmupFrames = topOffAudioQueue(
+                getAudioQueueTargetSize(AUDIO_WARMUP_MS),
+            );
+
+            if (warmupFrames > 0) {
+                drawFrame(kernel.lastFrameBuffer);
+                updateStatus();
+            }
+        }
+
+        hasStartedPlayback = true;
+        running = true;
+        setError('');
+        updateButtons();
     } catch (error) {
         setError(error.message);
     }
-
-    running = true;
-    setError('');
-    updateButtons();
 });
 
 pauseBtn.addEventListener('click', () => {

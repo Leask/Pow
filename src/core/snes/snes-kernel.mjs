@@ -18,6 +18,7 @@ class SNESKernel {
         this.onStatusUpdate = typeof options.onStatusUpdate === 'function'
             ? options.onStatusUpdate
             : null;
+        this.sampleRate = options.sampleRate ?? 44100;
 
         this.strictOpcodes = options.strictOpcodes ?? false;
 
@@ -174,7 +175,16 @@ class SNESKernel {
 
     #bootCore() {
         this.cartridge = new SNESCartridge(this.romData);
-        this.bus = new SNESBus(this.cartridge);
+        this.bus = new SNESBus(this.cartridge, {
+            sampleRate: this.sampleRate,
+            onAudioSample: (sample) => {
+                this.audioSampleCount += 1;
+
+                if (this.onAudioSample) {
+                    this.onAudioSample(sample, this.audioSampleCount);
+                }
+            },
+        });
         this.cpu = new CPU65816(this.bus, {
             strictOpcodes: this.strictOpcodes,
         });

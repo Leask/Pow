@@ -17,7 +17,9 @@ The core goals are:
 ## Hard Constraints
 
 - Keep the emulator core self-hosted.
-  - Do not add third-party emulator cores.
+  - Do not add new runtime third-party emulator dependencies.
+  - Existing SNES APU core files in `src/core/snes/apu/*` are vendored,
+    MIT-licensed source adapted from SnesJs. Keep attribution intact.
 - Do not merge NES and SNES kernels into one monolith.
   - Shared logic belongs in `src/shared/nintendo/*`.
 - Keep runtime dependencies at zero unless explicitly requested.
@@ -92,9 +94,9 @@ If you cannot run one of these checks, state it clearly.
 
 - Implemented mappers: `0`, `2`, `3`.
 - Systems currently wired in the app layer: `NES`, `SNES`.
-- APU is intentionally simplified right now.
-  - Prioritize stability and audible output.
-  - Do not claim cycle-accurate APU behavior unless implemented.
+- NES APU remains simplified.
+- SNES audio now uses an SPC700 + DSP core path, but is still not
+  cycle-accurate and still has feature gaps (for example echo behavior).
 - SNES currently has real execution plumbing (LoROM + 65C816 subset +
   DMA + VBlank/NMI + BG1 render path), but is still not cycle-accurate.
   - Do not claim full/playable SNES compatibility until sprites, windows,

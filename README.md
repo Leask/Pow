@@ -29,8 +29,14 @@ modern, powerful, and stable experience.
 - SNES LoROM bus + 65C816 CPU subset (strict-opcode tested on `Mario World.smc`)
 - SNES DMA path, APU I/O boot handshake emulation, VBlank/NMI timing
 - SNES PPU BG1/CGRAM/VRAM rendering path for GUI output
+- SNES SPC700 + DSP audio core integration (echo path still partial)
 - Bus, controller ports, and memory map integration
 - ROM format detection + kernel factory (`NES` / `SNES`)
+
+## Third-Party Code Notices
+
+- `src/core/snes/apu/*` contains MIT-licensed SNES APU core logic adapted
+  from SnesJs: https://github.com/angelo-wf/SnesJs
 
 ## Requirements
 
@@ -121,6 +127,6 @@ console.log(kernel.getExecutionState());
 - Stabilize NES and SNES browser GUI behavior and controls
 - Improve APU accuracy and timing behavior
 - Expand SNES instruction coverage and PPU features (sprites/window/HDMA)
-- Implement SNES APU audio path
+- Improve SNES APU accuracy (echo/timing edge cases)
 - Expand mapper coverage for broader ROM compatibility
 - Build compatibility benchmark suite and ROM matrix

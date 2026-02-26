@@ -1,5 +1,6 @@
 import { SNESPPU } from './ppu.mjs';
 import { SNESController } from './controller.mjs';
+import { SNESSimpleAudio } from './audio.mjs';
 
 const DMA_TRANSFER_PATTERNS = Object.freeze([
     [0],
@@ -18,16 +19,17 @@ const VBLANK_START_SCANLINE = 225;
 const FRAME_MASTER_CYCLES = MASTER_CYCLES_PER_SCANLINE * SCANLINES_PER_FRAME;
 
 class SNESBus {
-    constructor(cartridge) {
+    constructor(cartridge, options = {}) {
         this.cartridge = cartridge;
         this.ppu = new SNESPPU();
         this.controllers = [new SNESController(), new SNESController()];
+        this.audio = new SNESSimpleAudio({
+            sampleRate: options.sampleRate,
+            onSample: options.onAudioSample,
+        });
         this.wram = new Uint8Array(128 * 1024);
         this.ioRegs = new Uint8Array(0x100);
         this.dmaRegs = new Uint8Array(0x80);
-        this.apuPorts = new Uint8Array(4);
-        this.apuBootReady = false;
-        this.apuBootCycles = 0;
         this.irqPending = false;
         this.irqFlag = false;
 
@@ -61,7 +63,9 @@ class SNESBus {
         }
 
         if (isSystemBank && offset >= 0x2140 && offset <= 0x2143) {
-            return this.#setOpenBus(this.apuPorts[offset - 0x2140]);
+            return this.#setOpenBus(
+                this.audio.readPort(offset - 0x2140),
+            );
         }
 
         if (isSystemBank && offset >= 0x2180 && offset <= 0x2183) {
@@ -142,13 +146,7 @@ class SNESBus {
 
         if (isSystemBank && offset >= 0x2140 && offset <= 0x2143) {
             const portIndex = offset - 0x2140;
-            this.apuPorts[portIndex] = byte;
-
-            if (this.apuPorts[0] === 0x00 && this.apuPorts[1] === 0xff) {
-                this.apuBootReady = false;
-                this.apuBootCycles = 0;
-            }
-
+            this.audio.handlePortWrite(portIndex, byte);
             return;
         }
 
@@ -215,15 +213,14 @@ class SNESBus {
         const beforeScanline = this.ppu.scanline;
         const beforeCycle = this.ppu.cycle;
         this.cpuCycles += cycles;
-        this.apuBootCycles += cycles;
-
-        if (!this.apuBootReady && this.apuBootCycles >= 1024) {
-            this.apuBootReady = true;
-            this.apuPorts[0] = 0xaa;
-            this.apuPorts[1] = 0xbb;
-        }
+        this.audio.clock(cycles);
 
         this.ppu.clock(cycles * 6);
+        const completedFrames = this.ppu.frame - beforeFrame;
+
+        if (completedFrames > 0) {
+            this.audio.endFrame(completedFrames);
+        }
 
         if (this.#crossedScanline(
             beforeFrame,
@@ -255,9 +252,6 @@ class SNESBus {
             wram: Array.from(this.wram),
             ioRegs: Array.from(this.ioRegs),
             dmaRegs: Array.from(this.dmaRegs),
-            apuPorts: Array.from(this.apuPorts),
-            apuBootReady: this.apuBootReady,
-            apuBootCycles: this.apuBootCycles,
             irqPending: this.irqPending,
             irqFlag: this.irqFlag,
             wramPortAddress: this.wramPortAddress,
@@ -270,6 +264,7 @@ class SNESBus {
             hdmaRepeat: Array.from(this.hdmaRepeat),
             hdmaTableAddress: Array.from(this.hdmaTableAddress),
             hdmaIndirectAddress: Array.from(this.hdmaIndirectAddress),
+            audio: this.audio.saveState(),
             ppu: this.ppu.saveState(),
             controllers: this.controllers.map((controller) =>
                 controller.saveState(),
@@ -281,9 +276,6 @@ class SNESBus {
         this.wram.set(state.wram);
         this.ioRegs.set(state.ioRegs);
         this.dmaRegs.set(state.dmaRegs);
-        this.apuPorts.set(state.apuPorts ?? [0x00, 0x00, 0x00, 0x00]);
-        this.apuBootReady = Boolean(state.apuBootReady);
-        this.apuBootCycles = state.apuBootCycles >>> 0;
         this.irqPending = Boolean(state.irqPending);
         this.irqFlag = Boolean(state.irqFlag);
         this.wramPortAddress = state.wramPortAddress >>> 0;
@@ -296,6 +288,7 @@ class SNESBus {
         this.hdmaRepeat.set(state.hdmaRepeat ?? []);
         this.hdmaTableAddress.set(state.hdmaTableAddress ?? []);
         this.hdmaIndirectAddress.set(state.hdmaIndirectAddress ?? []);
+        this.audio.loadState(state.audio ?? {});
         this.ppu.loadState(state.ppu);
         this.controllers[0].loadState(state.controllers[0]);
         this.controllers[1].loadState(state.controllers[1]);
