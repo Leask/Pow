@@ -17,9 +17,9 @@ function clampToByte(value) {
 }
 
 function bgr555ToRgba(color, brightness = 15) {
-    const blue = color & 0x1f;
+    const red = color & 0x1f;
     const green = (color >>> 5) & 0x1f;
-    const red = (color >>> 10) & 0x1f;
+    const blue = (color >>> 10) & 0x1f;
     const scale = Math.max(0, Math.min(brightness, 15)) / 15;
     const r8 = (((red << 3) | (red >>> 2)) * scale) & 0xff;
     const g8 = (((green << 3) | (green >>> 2)) * scale) & 0xff;
@@ -655,12 +655,12 @@ class SNESPPU {
     }
 
     _blendBgr555(baseColor, addendColor, subtract, half) {
-        const baseB = baseColor & 0x1f;
+        const baseR = baseColor & 0x1f;
         const baseG = (baseColor >>> 5) & 0x1f;
-        const baseR = (baseColor >>> 10) & 0x1f;
-        const addB = addendColor & 0x1f;
+        const baseB = (baseColor >>> 10) & 0x1f;
+        const addR = addendColor & 0x1f;
         const addG = (addendColor >>> 5) & 0x1f;
-        const addR = (addendColor >>> 10) & 0x1f;
+        const addB = (addendColor >>> 10) & 0x1f;
         let outR = 0;
         let outG = 0;
         let outB = 0;
@@ -699,7 +699,7 @@ class SNESPPU {
             outR = 31;
         }
 
-        return outB | (outG << 5) | (outR << 10);
+        return outR | (outG << 5) | (outB << 10);
     }
 
     _windowRegionMatches(mode, inWindow) {
@@ -768,9 +768,9 @@ class SNESPPU {
         const red = lineState?.fixedColorR ?? this.fixedColorR;
 
         return (
-            (blue & 0x1f) |
+            (red & 0x1f) |
             ((green & 0x1f) << 5) |
-            ((red & 0x1f) << 10)
+            ((blue & 0x1f) << 10)
         ) & 0x7fff;
     }
 
