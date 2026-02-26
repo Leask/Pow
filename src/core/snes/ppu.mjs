@@ -1063,8 +1063,9 @@ class SNESPPU {
 
     _renderOBJ(target) {
         const objsel = this.registers[0x01];
-        const tileBase = (objsel & 0x07) << 13;
-        const nameSelectOffset = ((objsel >>> 3) & 0x03) << 12;
+        // OBSEL is word-addressed in hardware; convert to byte offsets.
+        const tileBase = (objsel & 0x07) << 14;
+        const nameSelectOffset = (1 + ((objsel >>> 3) & 0x03)) << 13;
         const sizeConfig = this._readOBJSizeConfig(objsel);
 
         for (let spriteIndex = 127; spriteIndex >= 0; spriteIndex -= 1) {
@@ -1090,7 +1091,10 @@ class SNESPPU {
             const palette = (attributes >>> 1) & 0x07;
             const objPriorityLevel = (attributes >>> 4) & 0x03;
             const nameSelect = attributes & 0x01;
-            const spriteTileBase = nameSelect ? nameSelectOffset : 0;
+            const spriteTileBase = nameSelect
+                ? ((tileBase + nameSelectOffset) & 0xffff)
+                : (tileBase & 0xffff);
+            const characterXBase = tileNumber & 0x0f;
 
             for (let localY = 0; localY < spriteHeight; localY += 1) {
                 const screenY = (y + localY) & 0xff;
@@ -1128,14 +1132,14 @@ class SNESPPU {
                         : localY;
                     const tileX = pixelX >>> 3;
                     const tileY = pixelY >>> 3;
+                    const characterY = (((tileNumber >>> 4) + tileY) & 0x0f) << 4;
                     const tileIndex = (
-                        tileNumber +
-                        tileX +
-                        (tileY * 16)
-                    ) & 0x01ff;
+                        characterY +
+                        ((characterXBase + tileX) & 0x0f)
+                    ) & 0xff;
 
                     const color = this._readTilePixel4bpp(
-                        (tileBase + spriteTileBase) & 0xffff,
+                        spriteTileBase,
                         tileIndex,
                         pixelX & 0x07,
                         pixelY & 0x07,
