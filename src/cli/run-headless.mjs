@@ -54,10 +54,11 @@ function printHelp() {
     console.log('Usage: node src/cli/run-headless.mjs [options]');
     console.log('');
     console.log('Options:');
-    console.log('  --rom <path>         Path to a .nes/.smc/.sfc ROM file');
-    console.log('  --system <name>      Force system: nes or snes');
+    console.log('  --rom <path>         NES, SNES, or N64 (.z64/.v64/.n64) ROM');
+    console.log('  --system <name>      Force system: nes, snes, or n64');
     console.log('  --frames <n>         Number of frames to execute');
-    console.log('  --strict-opcodes     Throw on unsupported opcodes (NES)');
+    console.log('  --strict-opcodes     Throw on unsupported NES/SNES opcodes');
+    console.log('                       N64 always stops on unsupported instructions');
     console.log('  --help, -h           Show this help');
 }
 
@@ -88,6 +89,13 @@ function buildSummary(romPath, system, metadata, state, requestedFrames) {
         summary.title = metadata.title;
         summary.region = metadata.region;
         summary.hasCopierHeader = metadata.hasCopierHeader;
+    }
+
+    if (system === 'n64') {
+        summary.title = metadata.title;
+        summary.region = metadata.region;
+        summary.rsp = state.rsp;
+        summary.audio = state.audio;
     }
 
     return summary;

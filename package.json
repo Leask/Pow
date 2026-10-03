@@ -1,7 +1,7 @@
 {
     "name": "pow",
     "version": "1.0.0",
-    "description": "A JS NES emulator developed from scratch. It features zero external dependencies and utilizes the latest JS features to ensure a thoroughly modern, powerful, and stable experience.",
+    "description": "An ESM JavaScript Nintendo emulator with independent NES, SNES, and experimental N64 kernels and zero runtime package dependencies.",
     "type": "module",
     "main": "src/index.mjs",
     "exports": {
@@ -22,12 +22,15 @@
         "start": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
         "smoke": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
         "smoke:snes": "node src/cli/run-headless.mjs --rom \"./Mario World.smc\" --frames 240 --strict-opcodes",
+        "smoke:n64": "node src/cli/verify-n64.mjs",
         "test": "node --test",
         "test:snes:long": "node --test test/snes-kernel.long-run.test.mjs",
         "gui": "PORT=8184 node src/cli/serve-gui.mjs"
     },
     "keywords": [
         "nes",
+        "snes",
+        "n64",
         "emulator",
         "javascript",
         "headless"

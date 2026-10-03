@@ -1,6 +1,7 @@
 const NINTENDO_SYSTEMS = Object.freeze({
     NES: 'nes',
     SNES: 'snes',
+    N64: 'n64',
 });
 
 function normalizeNintendoSystem(system) {
@@ -14,9 +15,13 @@ function normalizeNintendoSystem(system) {
         return NINTENDO_SYSTEMS.SNES;
     }
 
+    if (normalized === NINTENDO_SYSTEMS.N64) {
+        return NINTENDO_SYSTEMS.N64;
+    }
+
     throw new RangeError(
         `Unsupported system "${system}". ` +
-        `Use: ${NINTENDO_SYSTEMS.NES} or ${NINTENDO_SYSTEMS.SNES}.`,
+        'Use: nes, snes, or n64.',
     );
 }
 

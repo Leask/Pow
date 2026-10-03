@@ -1,11 +1,13 @@
 import { createNintendoKernelFromROM } from '../src/index.mjs';
+import { ButtonLatch } from './button-latch.mjs';
+import { N64WorkerClient } from './n64-worker-client.mjs';
 
 const DEFAULT_WIDTH = 256;
 const DEFAULT_HEIGHT = 240;
 const AUDIO_SAMPLE_RATE = 44_100;
 const AUDIO_QUEUE_CAPACITY = 262144;
-const AUDIO_WARMUP_MS = 120;
-const AUDIO_LOW_WATER_MS = 50;
+const AUDIO_WARMUP_MS = 180;
+const AUDIO_LOW_WATER_MS = 120;
 const AUDIO_CATCHUP_MAX_FRAMES = 8;
 
 const romInput = document.querySelector('#romInput');
@@ -18,6 +20,7 @@ const frameCount = document.querySelector('#frameCount');
 const fpsText = document.querySelector('#fps');
 const mapperText = document.querySelector('#mapper');
 const errorText = document.querySelector('#errorText');
+const audioStatus = document.querySelector('#audioStatus');
 const canvas = document.querySelector('#screen');
 const context = canvas.getContext('2d', { alpha: false });
 
@@ -40,6 +43,16 @@ let audioSize = 0;
 let kernelSampleRate = AUDIO_SAMPLE_RATE;
 let hasStartedPlayback = false;
 const audioQueue = new Float32Array(AUDIO_QUEUE_CAPACITY);
+const audioQueueRight = new Float32Array(AUDIO_QUEUE_CAPACITY);
+const stickKeys = new Set();
+let audioWorklet = false;
+let audioSubmitted = 0;
+let audioPlayed = 0;
+let audioEpoch = 0;
+const buttonLatch = new ButtonLatch(
+    (button) => kernel.pressButton(1, button),
+    (button) => kernel.releaseButton(1, button),
+);
 
 const keyMap = new Map([
     ['ArrowUp', 'UP'],
@@ -68,14 +81,38 @@ function clearAudioQueue() {
     audioWriteIndex = 0;
     audioReadIndex = 0;
     audioSize = 0;
+    audioSubmitted = 0;
+    audioPlayed = 0;
+    audioEpoch += 1;
+    if (audioWorklet) audioNode.port.postMessage({ type: 'clear', epoch: audioEpoch });
 }
 
-function pushAudioSample(sample) {
+function queuedAudioFrames() {
+    return audioSize + (audioWorklet ? Math.max(0, audioSubmitted - audioPlayed) : 0);
+}
+
+function flushAudioQueue() {
+    if (!audioWorklet || audioSize === 0) return;
+    const samples = new Float32Array(audioSize * 2);
+    const count = audioSize;
+    for (let i = 0; i < count; i += 1) {
+        samples[i * 2] = audioQueue[audioReadIndex];
+        samples[i * 2 + 1] = audioQueueRight[audioReadIndex];
+        audioReadIndex = (audioReadIndex + 1) % AUDIO_QUEUE_CAPACITY;
+    }
+    audioSize = 0;
+    audioSubmitted += count;
+    audioNode.port.postMessage({ type: 'samples', epoch: audioEpoch, samples },
+        [samples.buffer]);
+}
+
+function pushAudioSample(sample, right = sample) {
     if (audioSize >= AUDIO_QUEUE_CAPACITY) {
         return;
     }
 
     audioQueue[audioWriteIndex] = sample;
+    audioQueueRight[audioWriteIndex] = right;
     audioWriteIndex = (audioWriteIndex + 1) % AUDIO_QUEUE_CAPACITY;
     audioSize += 1;
 }
@@ -91,7 +128,7 @@ function pullAudioSample() {
     return sample;
 }
 
-function ensureAudioContext() {
+async function ensureAudioContext() {
     if (audioContext) {
         return audioContext;
     }
@@ -105,15 +142,41 @@ function ensureAudioContext() {
     audioContext = new AudioContextCtor({
         sampleRate: AUDIO_SAMPLE_RATE,
     });
-    audioNode = audioContext.createScriptProcessor(1024, 0, 1);
+    if (audioContext.audioWorklet) {
+        await audioContext.audioWorklet.addModule('/web/audio-worklet.mjs');
+        audioNode = new AudioWorkletNode(audioContext, 'pow-audio-output', {
+            numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
+        });
+        audioWorklet = true;
+        audioNode.port.onmessage = ({ data }) => {
+            if (data.epoch !== audioEpoch) return;
+            audioPlayed = data.played;
+            kernel?.reportPlayed?.(audioPlayed);
+            audioStatus.textContent = !running ? 'Paused'
+                : data.started ? 'Stereo' : 'Buffering';
+            audioStatus.dataset.played = String(data.played);
+            audioStatus.dataset.nonzero = String(data.nonzero);
+            audioStatus.dataset.peak = String(data.peak);
+            audioStatus.dataset.underruns = String(data.underruns);
+        };
+        audioNode.port.postMessage({ type: 'clear', epoch: audioEpoch });
+        audioNode.connect(audioContext.destination);
+        return audioContext;
+    }
+    audioNode = audioContext.createScriptProcessor(1024, 0, 2);
     audioNode.onaudioprocess = (event) => {
         const output = event.outputBuffer.getChannelData(0);
+        const right = event.outputBuffer.getChannelData(1);
 
         for (let index = 0; index < output.length; index += 1) {
+            if (kernel?.isAsync && audioSize > 0) audioPlayed += 1;
+            right[index] = audioSize > 0 ? audioQueueRight[audioReadIndex] : 0;
             output[index] = pullAudioSample();
         }
+        kernel?.reportPlayed?.(audioPlayed);
     };
     audioNode.connect(audioContext.destination);
+    audioStatus.textContent = 'Stereo (legacy output)';
     return audioContext;
 }
 
@@ -171,6 +234,10 @@ function formatMapper(metadata) {
         return `${metadata.layout} / 0x${mapMode}`;
     }
 
+    if (currentSystem === 'n64') {
+        return `${metadata.region} / VR4300`;
+    }
+
     return '-';
 }
 
@@ -223,9 +290,16 @@ function runOneFrame() {
     }
 
     kernel.runFrame();
+    if (kernel.isAsync) return;
+    buttonLatch.advance(kernel.frameCount);
+    flushAudioQueue();
     drawFrame(kernel.lastFrameBuffer);
     updateStatus();
 
+    recordFrame();
+}
+
+function recordFrame() {
     fpsCounter += 1;
     const now = performance.now();
 
@@ -237,6 +311,7 @@ function runOneFrame() {
 }
 
 function topOffAudioQueue(targetSize) {
+    if (kernel?.isAsync) return 0;
     if (!kernel || !audioContext || audioContext.state !== 'running') {
         return 0;
     }
@@ -244,19 +319,27 @@ function topOffAudioQueue(targetSize) {
     let framesAdvanced = 0;
 
     while (
-        audioSize < targetSize &&
+        queuedAudioFrames() < targetSize &&
         framesAdvanced < AUDIO_CATCHUP_MAX_FRAMES
     ) {
         kernel.runFrame();
+        buttonLatch.advance(kernel.frameCount);
+        flushAudioQueue();
         framesAdvanced += 1;
+        fpsCounter += 1;
     }
 
     return framesAdvanced;
 }
 
 function loop() {
-    if (running) {
+    if (running && !kernel?.isAsync) {
         try {
+            if (audioWorklet && queuedAudioFrames() >=
+                getAudioQueueTargetSize(AUDIO_WARMUP_MS)) {
+                requestAnimationFrame(loop);
+                return;
+            }
             runOneFrame();
             const catchupFrames = topOffAudioQueue(
                 getAudioQueueTargetSize(AUDIO_LOW_WATER_MS),
@@ -283,18 +366,52 @@ function createKernel(romData, fileName, sampleRate = getAudioSampleRate()) {
         : AUDIO_SAMPLE_RATE;
 
     kernelSampleRate = normalizedSampleRate;
+    buttonLatch.clear();
+    kernel?.dispose?.();
+    stickKeys.clear();
     hasStartedPlayback = false;
     clearAudioQueue();
 
     const selected = createNintendoKernelFromROM(romData, {
         sampleRate: normalizedSampleRate,
         onAudioSample: (sample) => {
-            pushAudioSample(sample);
+            if (currentSystem !== 'n64') pushAudioSample(sample);
         },
+        onAudioFrame: (left, right) => pushAudioSample(left, right),
     });
 
-    kernel = selected.kernel;
     currentSystem = selected.system;
+    if (currentSystem === 'n64') {
+        const client = new N64WorkerClient({
+            sampleRate: normalizedSampleRate,
+            onAudioBlock: (audio) => {
+                if (kernel !== client) return;
+                for (let i = 0; i < audio.length; i += 2) {
+                    pushAudioSample(audio[i], audio[i + 1]);
+                }
+                flushAudioQueue();
+            },
+            onFrame: () => {
+                if (kernel !== client) return;
+                drawFrame(client.lastFrameBuffer);
+                updateStatus();
+                recordFrame();
+            },
+            onError: (error) => {
+                if (kernel !== client) return;
+                running = false;
+                if (audioWorklet) audioNode.port.postMessage({
+                    type: 'active', value: false,
+                });
+                clearAudioQueue();
+                updateButtons();
+                setError(error.message);
+            },
+        });
+        kernel = client;
+    } else {
+        kernel = selected.kernel;
+    }
     const metadata = kernel.loadROMBuffer(romData);
     const screen = metadata.screen ?? {
         width: DEFAULT_WIDTH,
@@ -318,7 +435,27 @@ function handleButtonEvent(event, pressed) {
         return;
     }
 
-    const button = keyMap.get(event.key) || keyMap.get(event.key.toLowerCase());
+    const key = event.key.toLowerCase();
+    if (currentSystem === 'n64' &&
+        ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd']
+            .includes(key)) {
+        event.preventDefault();
+        if (pressed) stickKeys.add(key);
+        else stickKeys.delete(key);
+        const down = (...keys) => keys.some((name) => stickKeys.has(name));
+        let x = (Number(down('d', 'arrowright')) -
+            Number(down('a', 'arrowleft'))) * 80;
+        let y = (Number(down('w', 'arrowup')) -
+            Number(down('s', 'arrowdown'))) * 80;
+        if (x !== 0 && y !== 0) { x *= 0.7071; y *= 0.7071; }
+        kernel.setAnalogStick(1, x, y);
+        return;
+    }
+    const n64Keys = {
+        shift: 'Z', u: 'C_LEFT', i: 'C_UP', o: 'C_RIGHT', p: 'C_DOWN',
+    };
+    const button = (currentSystem === 'n64' ? n64Keys[key] : null) ||
+        keyMap.get(event.key) || keyMap.get(key);
 
     if (!button) {
         return;
@@ -327,10 +464,12 @@ function handleButtonEvent(event, pressed) {
     event.preventDefault();
 
     try {
-        if (pressed) {
-            kernel.pressButton(1, button);
+        if (kernel.isAsync) {
+            if (pressed) kernel.pressButton(1, button);
+            else kernel.releaseButton(1, button);
         } else {
-            kernel.releaseButton(1, button);
+            buttonLatch.update(button, pressed, kernel.frameCount,
+                currentSystem === 'n64' ? 3 : 1);
         }
     } catch (error) {
         if (!(error instanceof RangeError)) {
@@ -349,6 +488,7 @@ romInput.addEventListener('change', async (event) => {
     try {
         setError('');
         running = false;
+        if (audioWorklet) audioNode.port.postMessage({ type: 'active', value: false });
         updateButtons();
 
         const arrayBuffer = await file.arrayBuffer();
@@ -366,8 +506,9 @@ startBtn.addEventListener('click', async () => {
     }
 
     try {
-        const contextForPlayback = ensureAudioContext();
+        const contextForPlayback = await ensureAudioContext();
         await contextForPlayback.resume();
+        if (audioWorklet) audioNode.port.postMessage({ type: 'active', value: true });
 
         if (!hasStartedPlayback && lastRomData) {
             const outputSampleRate = Math.round(
@@ -390,8 +531,10 @@ startBtn.addEventListener('click', async () => {
 
         hasStartedPlayback = true;
         running = true;
+        kernel.start?.();
         setError('');
         updateButtons();
+        canvas.focus({ preventScroll: true });
     } catch (error) {
         setError(error.message);
     }
@@ -399,6 +542,9 @@ startBtn.addEventListener('click', async () => {
 
 pauseBtn.addEventListener('click', () => {
     running = false;
+    kernel?.pause?.();
+    if (audioWorklet) audioNode.port.postMessage({ type: 'active', value: false });
+    clearAudioQueue();
     updateButtons();
 });
 
@@ -409,7 +555,21 @@ resetBtn.addEventListener('click', () => {
 
     try {
         running = false;
-        createKernel(lastRomData, lastRomName);
+        if (audioWorklet) audioNode.port.postMessage({ type: 'active', value: false });
+        if (currentSystem === 'n64') {
+            // Reset the machine, not the cartridge's persistent EEPROM.
+            kernel.reset();
+            buttonLatch.clear();
+            stickKeys.clear();
+            clearAudioQueue();
+            hasStartedPlayback = false;
+            fpsCounter = 0;
+            fpsClock = performance.now();
+            runOneFrame();
+            updateButtons();
+        } else {
+            createKernel(lastRomData, lastRomName);
+        }
         setError('');
     } catch (error) {
         setError(error.message);
@@ -431,6 +591,18 @@ window.addEventListener('keydown', (event) => {
 
 window.addEventListener('keyup', (event) => {
     handleButtonEvent(event, false);
+});
+
+window.addEventListener('blur', () => {
+    buttonLatch.clear();
+    stickKeys.clear();
+    if (currentSystem === 'n64' && kernel) kernel.setAnalogStick(1, 0, 0);
+    const buttons = new Set([...keyMap.values(), 'Z',
+        'C_LEFT', 'C_RIGHT', 'C_UP', 'C_DOWN']);
+    for (const button of buttons) {
+        try { kernel?.releaseButton(1, button); }
+        catch (error) { if (!(error instanceof RangeError)) setError(error.message); }
+    }
 });
 
 context.fillStyle = '#000000';

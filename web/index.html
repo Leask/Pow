@@ -6,7 +6,7 @@
         name="viewport"
         content="width=device-width, initial-scale=1, viewport-fit=cover"
     >
-    <title>Pow NES GUI</title>
+    <title>Pow Nintendo Emulator</title>
     <style>
         :root {
             color-scheme: light;
@@ -113,7 +113,7 @@
     <main class="layout">
         <section class="panel">
             <div class="controls">
-                <input id="romInput" type="file" accept=".nes,.smc,.sfc">
+                <input id="romInput" type="file" accept=".nes,.smc,.sfc,.z64,.v64,.n64">
                 <button id="startBtn" disabled>Start</button>
                 <button id="pauseBtn" disabled>Pause</button>
                 <button id="resetBtn" disabled>Reset</button>
@@ -124,16 +124,20 @@
                 <span>Frames: <strong id="frameCount">0</strong></span>
                 <span>FPS: <strong id="fps">0</strong></span>
                 <span>Mapper: <strong id="mapper">-</strong></span>
+                <span>Audio: <strong id="audioStatus">Click Start</strong></span>
             </div>
             <p class="help">
                 Keyboard: Arrow keys / WASD, J=A, K=B, Enter=Start,
                 Shift=Select, U=X, I=Y, Q=L, E=R (SNES).
+                N64: Arrows/WASD=Stick, J=A, K=B, Shift=Z,
+                U/I/O/P=C-Left/Up/Right/Down, Q=L, E=R.
             </p>
             <p class="error" id="errorText"></p>
         </section>
 
         <section class="panel canvas-wrap">
-            <canvas id="screen" width="256" height="240"></canvas>
+            <canvas id="screen" width="256" height="240" tabindex="0"
+                aria-label="Game screen"></canvas>
         </section>
     </main>
 

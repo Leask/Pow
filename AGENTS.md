@@ -9,7 +9,7 @@ Read it before making changes.
 The core goals are:
 
 - Correct emulation behavior for real ROMs.
-- Keep NES and SNES as separate kernels with clean boundaries.
+- Keep NES, SNES, and N64 as separate kernels with clean boundaries.
 - Zero external emulator dependencies.
 - Clean, maintainable, testable architecture.
 - Shared core that works in both Node.js and browser environments.
@@ -20,7 +20,7 @@ The core goals are:
   - Do not add new runtime third-party emulator dependencies.
   - Existing SNES APU core files in `src/core/snes/apu/*` are vendored,
     MIT-licensed source adapted from SnesJs. Keep attribution intact.
-- Do not merge NES and SNES kernels into one monolith.
+- Do not merge NES, SNES, and N64 kernels into one monolith.
   - Shared logic belongs in `src/shared/nintendo/*`.
 - Keep runtime dependencies at zero unless explicitly requested.
 - Keep the codebase ESM-only.
@@ -42,6 +42,9 @@ The core goals are:
     `snes/snes-kernel.mjs`, `snes/smc.mjs`, `snes/cartridge.mjs`,
     `snes/bus.mjs`, `snes/cpu65816.mjs`, `snes/ppu.mjs`,
     `snes/controller.mjs`
+  - Experimental N64 kernel: `n64/*`
+    - VR4300 interpreter, RCP bus, Fast3D/RDP graphics, ABI1/AI stereo audio
+    - Architecture, validation, and limits: `docs/n64-development.md`
   - Multi-system orchestration:
     `system-detect.mjs`, `emulator-factory.mjs`
 - Public API: `src/index.mjs`
@@ -49,6 +52,8 @@ The core goals are:
   - `src/cli/run-headless.mjs`
 - Browser static GUI:
   - `web/index.html`, `web/app.mjs`
+  - N64 worker/client: `web/n64-worker.mjs`, `web/n64-worker-client.mjs`
+  - Stereo playback: `web/audio-worklet.mjs`
   - server: `src/cli/serve-gui.mjs`
 - Tests:
   - `test/*.mjs`
@@ -61,6 +66,9 @@ The core goals are:
   - Start audio only after user interaction (clicking `Start`).
   - Keep audio callback flow for active systems:
     `Kernel(onAudioSample)` -> system audio path -> GUI audio queue.
+  - N64 uses `onAudioFrame(left, right)` for stereo. Do not enqueue its
+    compatibility mono callback a second time.
+  - AudioWorklet epochs discard stale samples on reset or ROM changes.
 - Background scrolling is timing-sensitive.
   - Do not reset scanline scroll buffers at pre-render.
   - SMB-style mid-frame scroll writes rely on per-scanline latching.
@@ -87,13 +95,17 @@ After code changes, run all relevant checks:
    - Verify `GET /` and `GET /web/app.mjs` return `200`.
    - Verify `GET /src/index.mjs` returns `200`.
    - Manual ROM load sanity check in browser.
+5. For N64 changes, when the external reference ROM is available:
+   - `N64_ROM='/path/to/Super Mario 64 (U).z64' npm run smoke:n64`
+   - Inspect the generated scenes and audio signal report, not just exit status.
+   - Never commit ROMs or derived memory/audio artifacts from `tmp/`.
 
 If you cannot run one of these checks, state it clearly.
 
 ## Compatibility and Scope
 
 - Implemented mappers: `0`, `2`, `3`.
-- Systems currently wired in the app layer: `NES`, `SNES`.
+- Systems currently wired in the app layer: `NES`, `SNES`, `N64`.
 - NES APU remains simplified.
 - SNES audio now uses an SPC700 + DSP core path, but is still not
   cycle-accurate and still has feature gaps (for example echo behavior).
@@ -103,6 +115,11 @@ If you cannot run one of these checks, state it clearly.
     HDMA edge cases, and APU audio are completed.
 - Keep changes mapper-safe unless intentionally expanding support.
 - For new mapper work, add focused tests and avoid regressions in mapper 0.
+- N64 runs the unmodified SM64 NTSC-U reference ROM through interactive
+  courtyard gameplay, using post-IPL boot and Fast3D/ABI1 task-level HLE.
+  It is not a general RSP interpreter or a cycle/pixel-accurate implementation.
+  Busy software-rendered scenes can cause slowdowns and browser audio underruns.
+  Keep game-specific addresses and assertions in verification tools, not core.
 
 ## Documentation Discipline
 

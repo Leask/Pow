@@ -1,4 +1,5 @@
 import { parseSNESHeader } from './snes/smc.mjs';
+import { isN64ROM } from './n64/rom.mjs';
 import { toByteArray } from '../shared/nintendo/rom-buffer.mjs';
 import { NINTENDO_SYSTEMS } from '../shared/nintendo/systems.mjs';
 
@@ -25,12 +26,16 @@ function detectNintendoSystem(romData) {
         return NINTENDO_SYSTEMS.NES;
     }
 
+    if (isN64ROM(rom)) {
+        return NINTENDO_SYSTEMS.N64;
+    }
+
     try {
         parseSNESHeader(rom);
         return NINTENDO_SYSTEMS.SNES;
     } catch {
         throw new Error(
-            'Unsupported ROM format. Expected iNES (.nes) or SNES (.smc/.sfc).',
+            'Unsupported ROM format. Expected NES, SNES, or N64 ROM.',
         );
     }
 }
