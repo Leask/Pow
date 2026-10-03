@@ -54,11 +54,17 @@ function printHelp() {
     console.log('Usage: node src/cli/run-headless.mjs [options]');
     console.log('');
     console.log('Options:');
-    console.log('  --rom <path>         NES, SNES, or N64 (.z64/.v64/.n64) ROM');
-    console.log('  --system <name>      Force system: nes, snes, or n64');
+    console.log(
+        '  --rom <path>         NES, SNES, N64, GB, GBC, GBA, or NDS ROM',
+    );
+    console.log(
+        '  --system <name>      Force: nes, snes, n64, gb, gbc, gba, nds',
+    );
     console.log('  --frames <n>         Number of frames to execute');
     console.log('  --strict-opcodes     Throw on unsupported NES/SNES opcodes');
-    console.log('                       N64 always stops on unsupported instructions');
+    console.log(
+        '                       N64 and handhelds stop on unsupported instructions',
+    );
     console.log('  --help, -h           Show this help');
 }
 
@@ -96,6 +102,13 @@ function buildSummary(romPath, system, metadata, state, requestedFrames) {
         summary.region = metadata.region;
         summary.rsp = state.rsp;
         summary.audio = state.audio;
+    }
+    if (['gb', 'gbc', 'gba', 'nds'].includes(system)) {
+        summary.title = metadata.title;
+        summary.gameCode = metadata.gameCode;
+        summary.screen = metadata.screen;
+        if (system === 'gb' || system === 'gbc')
+            summary.mapper = metadata.mapperId;
     }
 
     return summary;

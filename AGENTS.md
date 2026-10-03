@@ -10,6 +10,7 @@ The core goals are:
 
 - Correct emulation behavior for real ROMs.
 - Keep NES, SNES, and N64 as separate kernels with clean boundaries.
+- Keep GB/GBC, GBA and NDS kernels independent; share hardware utilities only.
 - Zero external emulator dependencies.
 - Clean, maintainable, testable architecture.
 - Shared core that works in both Node.js and browser environments.
@@ -45,6 +46,10 @@ The core goals are:
   - Experimental N64 kernel: `n64/*`
     - VR4300 interpreter, RCP bus, Fast3D/RDP graphics, ABI1/AI stereo audio
     - Architecture, validation, and limits: `docs/n64-development.md`
+  - Handheld kernels: `gb/*`, `gba/*`, `nds/*`
+    - Original SM83 and shared ARM/Thumb interpreters, stereo audio,
+      GB/CGB LCD, GBA video and NDS dual-screen 2D/touch devices
+    - Architecture, validation, and limits: `docs/handheld-development.md`
   - Multi-system orchestration:
     `system-detect.mjs`, `emulator-factory.mjs`
 - Public API: `src/index.mjs`
@@ -53,6 +58,7 @@ The core goals are:
 - Browser static GUI:
   - `web/index.html`, `web/app.mjs`
   - N64 worker/client: `web/n64-worker.mjs`, `web/n64-worker-client.mjs`
+    - Also dispatches handhelds via the factory; preserve legacy exports.
   - Stereo playback: `web/audio-worklet.mjs`
   - server: `src/cli/serve-gui.mjs`
 - Tests:
@@ -68,6 +74,8 @@ The core goals are:
     `Kernel(onAudioSample)` -> system audio path -> GUI audio queue.
   - N64 uses `onAudioFrame(left, right)` for stereo. Do not enqueue its
     compatibility mono callback a second time.
+  - Handhelds use the same stereo-only GUI path. NDS quick pointer taps
+    are latched across frames; coordinates address the lower screen.
   - AudioWorklet epochs discard stale samples on reset or ROM changes.
 - Background scrolling is timing-sensitive.
   - Do not reset scanline scroll buffers at pre-render.
@@ -99,13 +107,22 @@ After code changes, run all relevant checks:
    - `N64_ROM='/path/to/Super Mario 64 (U).z64' npm run smoke:n64`
    - Inspect the generated scenes and audio signal report, not just exit status.
    - Never commit ROMs or derived memory/audio artifacts from `tmp/`.
+6. For handheld changes with matching external ROMs:
+   - `GB_ROM=... GBA_ROM=... NDS_ROM=... npm run smoke:handhelds`
+   - Inspect PNG scenes, audio signal reports and stereo WAVs.
+   - GBC coverage is synthetic until a real GBC ROM is supplied.
 
 If you cannot run one of these checks, state it clearly.
 
 ## Compatibility and Scope
 
 - Implemented mappers: `0`, `2`, `3`.
-- Systems currently wired in the app layer: `NES`, `SNES`, `N64`.
+- Systems wired in the app layer: `NES`, `SNES`, `N64`, `GB`, `GBC`,
+  `GBA`, `NDS`. Handhelds are initial implementations with explicit limits
+  in the handheld development notes.
+- NDS currently supports a 2D subset, not the geometry/3D engine. The
+  Chessmaster reference reaches interactive play; do not extrapolate this
+  to general NDS compatibility. GBA/DS BIOS and boot use original HLE.
 - NES APU remains simplified.
 - SNES audio now uses an SPC700 + DSP core path, but is still not
   cycle-accurate and still has feature gaps (for example echo behavior).

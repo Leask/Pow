@@ -75,5 +75,7 @@ const server = http.createServer((request, response) => {
 
 server.listen(port, host, () => {
     console.log(`GUI server running at http://${host}:${port}`);
-    console.log('Open this URL and load a NES, SNES, or N64 ROM file.');
+    console.log(
+        'Open this URL and load a NES, SNES, N64, GB, GBC, GBA, or NDS ROM file.',
+    );
 });

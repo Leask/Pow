@@ -1,7 +1,7 @@
 {
     "name": "pow",
     "version": "1.0.0",
-    "description": "An ESM JavaScript Nintendo emulator with independent NES, SNES, and experimental N64 kernels and zero runtime package dependencies.",
+    "description": "An ESM JavaScript Nintendo emulator with independent NES, SNES, N64, GB/GBC, GBA and NDS kernels and zero runtime package dependencies.",
     "type": "module",
     "main": "src/index.mjs",
     "exports": {
@@ -23,6 +23,10 @@
         "smoke": "node src/cli/run-headless.mjs --rom ./Mario.nes --frames 120",
         "smoke:snes": "node src/cli/run-headless.mjs --rom \"./Mario World.smc\" --frames 240 --strict-opcodes",
         "smoke:n64": "node src/cli/verify-n64.mjs",
+        "smoke:gb": "node src/cli/verify-handhelds.mjs gb",
+        "smoke:gba": "node src/cli/verify-handhelds.mjs gba",
+        "smoke:nds": "node src/cli/verify-handhelds.mjs nds",
+        "smoke:handhelds": "node src/cli/verify-handhelds.mjs all",
         "test": "node --test",
         "test:snes:long": "node --test test/snes-kernel.long-run.test.mjs",
         "gui": "PORT=8184 node src/cli/serve-gui.mjs"
@@ -31,6 +35,10 @@
         "nes",
         "snes",
         "n64",
+        "gb",
+        "gbc",
+        "gba",
+        "nds",
         "emulator",
         "javascript",
         "headless"

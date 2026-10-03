@@ -1,4 +1,4 @@
-import { N64Kernel } from '../src/core/n64/n64-kernel.mjs';
+import { createNintendoKernel } from '../src/core/emulator-factory.mjs';
 import { ButtonLatch } from './button-latch.mjs';
 
 let kernel;
@@ -10,6 +10,9 @@ let played = 0;
 let target = 0;
 let samples;
 let sampleOffset = 0;
+let touchPressedFrame = null;
+let touchReleaseFrame = null;
+let touchCoordinates = [0, 0];
 const scheduler = new MessageChannel();
 scheduler.port1.onmessage = ({ data }) => {
     if (data === epoch) pump();
@@ -39,6 +42,10 @@ function sendFrame() {
 function step() {
     kernel.runFrame();
     buttons.advance(kernel.frameCount);
+    if (touchReleaseFrame !== null && kernel.frameCount >= touchReleaseFrame) {
+        kernel.setTouch(...touchCoordinates, false);
+        touchReleaseFrame = touchPressedFrame = null;
+    }
     sendFrame();
 }
 
@@ -77,6 +84,10 @@ self.onmessage = ({ data }) => {
             running = false;
             clearTimeout(timer);
             submitted = played = sampleOffset = 0;
+            if (touchPressedFrame !== null && kernel) {
+                kernel.setTouch(...touchCoordinates, false);
+            }
+            touchReleaseFrame = touchPressedFrame = null;
         } else if (data.epoch !== epoch) return;
         switch (data.type) {
             case 'load': {
@@ -84,7 +95,7 @@ self.onmessage = ({ data }) => {
                 const rate = data.sampleRate;
                 samples = new Float32Array(Math.ceil(rate / 50) * 2 + 16);
                 target = Math.ceil(rate * 0.18);
-                kernel = new N64Kernel({
+                kernel = createNintendoKernel(data.system ?? 'n64', {
                     sampleRate: rate,
                     onAudioFrame: (left, right) => {
                         samples[sampleOffset++] = left;
@@ -118,6 +129,20 @@ self.onmessage = ({ data }) => {
                 break;
             case 'stick':
                 kernel.setAnalogStick(1, data.x, data.y);
+                break;
+            case 'touch':
+                touchCoordinates = [data.x, data.y];
+                if (data.down) {
+                    if (touchPressedFrame === null)
+                        touchPressedFrame = kernel.frameCount;
+                    touchReleaseFrame = null;
+                    kernel.setTouch(data.x, data.y, true);
+                } else if (touchPressedFrame !== null) {
+                    touchReleaseFrame = Math.max(
+                        kernel.frameCount,
+                        touchPressedFrame + 3,
+                    );
+                }
                 break;
         }
     } catch (error) {

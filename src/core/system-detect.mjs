@@ -1,5 +1,8 @@
 import { parseSNESHeader } from './snes/smc.mjs';
 import { isN64ROM } from './n64/rom.mjs';
+import { isGBROM, parseGBHeader } from './gb/cartridge.mjs';
+import { isGBAROM } from './gba/rom.mjs';
+import { isNDSROM } from './nds/rom.mjs';
 import { toByteArray } from '../shared/nintendo/rom-buffer.mjs';
 import { NINTENDO_SYSTEMS } from '../shared/nintendo/systems.mjs';
 
@@ -30,12 +33,16 @@ function detectNintendoSystem(romData) {
         return NINTENDO_SYSTEMS.N64;
     }
 
+    if (isGBROM(rom)) return parseGBHeader(rom).color ? 'gbc' : 'gb';
+    if (isGBAROM(rom)) return 'gba';
+    if (isNDSROM(rom)) return 'nds';
+
     try {
         parseSNESHeader(rom);
         return NINTENDO_SYSTEMS.SNES;
     } catch {
         throw new Error(
-            'Unsupported ROM format. Expected NES, SNES, or N64 ROM.',
+            'Unsupported ROM format. Expected NES, SNES, N64, GB, GBC, GBA, or NDS ROM.',
         );
     }
 }

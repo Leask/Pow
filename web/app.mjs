@@ -1,6 +1,6 @@
 import { createNintendoKernelFromROM } from '../src/index.mjs';
 import { ButtonLatch } from './button-latch.mjs';
-import { N64WorkerClient } from './n64-worker-client.mjs';
+import { NintendoWorkerClient } from './n64-worker-client.mjs';
 
 const DEFAULT_WIDTH = 256;
 const DEFAULT_HEIGHT = 240;
@@ -237,6 +237,10 @@ function formatMapper(metadata) {
     if (currentSystem === 'n64') {
         return `${metadata.region} / VR4300`;
     }
+    if (currentSystem === 'gb' || currentSystem === 'gbc')
+        return `MBC${metadata.mapperId ?? 0} / SM83`;
+    if (currentSystem === 'gba') return `${metadata.gameCode} / ARM7TDMI`;
+    if (currentSystem === 'nds') return `${metadata.gameCode} / ARM9 + ARM7`;
 
     return '-';
 }
@@ -375,14 +379,16 @@ function createKernel(romData, fileName, sampleRate = getAudioSampleRate()) {
     const selected = createNintendoKernelFromROM(romData, {
         sampleRate: normalizedSampleRate,
         onAudioSample: (sample) => {
-            if (currentSystem !== 'n64') pushAudioSample(sample);
+            if (!['n64', 'gb', 'gbc', 'gba', 'nds'].includes(currentSystem))
+                pushAudioSample(sample);
         },
         onAudioFrame: (left, right) => pushAudioSample(left, right),
     });
 
     currentSystem = selected.system;
-    if (currentSystem === 'n64') {
-        const client = new N64WorkerClient({
+    if (['n64', 'gb', 'gbc', 'gba', 'nds'].includes(currentSystem)) {
+        const client = new NintendoWorkerClient({
+            system: currentSystem,
             sampleRate: normalizedSampleRate,
             onAudioBlock: (audio) => {
                 if (kernel !== client) return;
@@ -419,6 +425,7 @@ function createKernel(romData, fileName, sampleRate = getAudioSampleRate()) {
     };
 
     ensureImageBuffer(screen.width, screen.height);
+    canvas.classList.toggle('dual-screen', currentSystem === 'nds');
 
     romName.textContent = `${fileName} (${currentSystem.toUpperCase()})`;
     mapperText.textContent = formatMapper(metadata);
@@ -461,6 +468,13 @@ function handleButtonEvent(event, pressed) {
         return;
     }
 
+    if (
+        ['gb', 'gbc', 'nes'].includes(currentSystem) &&
+        ['X', 'Y', 'L', 'R'].includes(button)
+    )
+        return;
+    if (currentSystem === 'gba' && ['X', 'Y'].includes(button)) return;
+
     event.preventDefault();
 
     try {
@@ -499,6 +513,23 @@ romInput.addEventListener('change', async (event) => {
         setError(error.message);
     }
 });
+
+function handleTouch(event, down) {
+    if (!kernel || currentSystem !== 'nds') return;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 256;
+    const y = ((event.clientY - rect.top) / rect.height) * 384 - 192;
+    if (down && (y < 0 || y >= 192)) return;
+    event.preventDefault();
+    if (event.type === 'pointerdown') canvas.setPointerCapture(event.pointerId);
+    kernel.setTouch(x, y, down);
+}
+canvas.addEventListener('pointerdown', (event) => handleTouch(event, true));
+canvas.addEventListener('pointermove', (event) => {
+    if (event.buttons) handleTouch(event, true);
+});
+canvas.addEventListener('pointerup', (event) => handleTouch(event, false));
+canvas.addEventListener('pointercancel', (event) => handleTouch(event, false));
 
 startBtn.addEventListener('click', async () => {
     if (!kernel) {
@@ -600,9 +631,40 @@ window.addEventListener('blur', () => {
     const buttons = new Set([...keyMap.values(), 'Z',
         'C_LEFT', 'C_RIGHT', 'C_UP', 'C_DOWN']);
     for (const button of buttons) {
-        try { kernel?.releaseButton(1, button); }
-        catch (error) { if (!(error instanceof RangeError)) setError(error.message); }
+        if (
+            ['gb', 'gbc', 'nes'].includes(currentSystem) &&
+            [
+                'X',
+                'Y',
+                'L',
+                'R',
+                'Z',
+                'C_LEFT',
+                'C_RIGHT',
+                'C_UP',
+                'C_DOWN',
+            ].includes(button)
+        )
+            continue;
+        if (
+            currentSystem === 'gba' &&
+            ['X', 'Y', 'Z', 'C_LEFT', 'C_RIGHT', 'C_UP', 'C_DOWN'].includes(
+                button,
+            )
+        )
+            continue;
+        if (
+            currentSystem !== 'n64' &&
+            ['Z', 'C_LEFT', 'C_RIGHT', 'C_UP', 'C_DOWN'].includes(button)
+        )
+            continue;
+        try {
+            kernel?.releaseButton(1, button);
+        } catch (error) {
+            if (!(error instanceof RangeError)) setError(error.message);
+        }
     }
+    if (currentSystem === 'nds' && kernel) kernel.setTouch(0, 0, false);
 });
 
 context.fillStyle = '#000000';

@@ -88,6 +88,7 @@
         }
 
         canvas {
+            touch-action: none;
             width: min(100%, 768px);
             image-rendering: pixelated;
             image-rendering: crisp-edges;
@@ -99,6 +100,10 @@
             margin-top: 10px;
             color: var(--muted);
             font-size: 13px;
+        }
+
+        canvas.dual-screen {
+            width: min(100%, 512px);
         }
 
         .error {
@@ -113,7 +118,7 @@
     <main class="layout">
         <section class="panel">
             <div class="controls">
-                <input id="romInput" type="file" accept=".nes,.smc,.sfc,.z64,.v64,.n64">
+                <input id="romInput" type="file" accept=".nes,.smc,.sfc,.z64,.v64,.n64,.gb,.gbc,.gba,.nds">
                 <button id="startBtn" disabled>Start</button>
                 <button id="pauseBtn" disabled>Pause</button>
                 <button id="resetBtn" disabled>Reset</button>
@@ -131,6 +136,9 @@
                 Shift=Select, U=X, I=Y, Q=L, E=R (SNES).
                 N64: Arrows/WASD=Stick, J=A, K=B, Shift=Z,
                 U/I/O/P=C-Left/Up/Right/Down, Q=L, E=R.
+                GB/GBC/GBA: Arrows/WASD, J=A, K=B, Enter=Start,
+                Shift=Select, Q=L, E=R (GBA).
+                NDS: U=X, I=Y; click or touch the lower screen.
             </p>
             <p class="error" id="errorText"></p>
         </section>

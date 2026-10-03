@@ -1,6 +1,9 @@
 import { NESKernel } from './nes-kernel.mjs';
 import { SNESKernel } from './snes/snes-kernel.mjs';
 import { N64Kernel } from './n64/n64-kernel.mjs';
+import { GBKernel, GBCKernel } from './gb/gb-kernel.mjs';
+import { GBAKernel } from './gba/gba-kernel.mjs';
+import { NDSKernel } from './nds/nds-kernel.mjs';
 import { detectNintendoSystem } from './system-detect.mjs';
 import {
     NINTENDO_SYSTEMS,
@@ -9,6 +12,11 @@ import {
 
 function createNintendoKernel(system, options = {}) {
     const normalized = normalizeNintendoSystem(system);
+
+    if (normalized === 'gb') return new GBKernel(options);
+    if (normalized === 'gbc') return new GBCKernel(options);
+    if (normalized === 'gba') return new GBAKernel(options);
+    if (normalized === 'nds') return new NDSKernel(options);
 
     if (normalized === NINTENDO_SYSTEMS.NES) {
         return new NESKernel(options);

@@ -1,4 +1,7 @@
 import { parseN64Header } from '../src/core/n64/rom.mjs';
+import { parseGBHeader } from '../src/core/gb/cartridge.mjs';
+import { parseGBAHeader } from '../src/core/gba/rom.mjs';
+import { parseNDSHeader } from '../src/core/nds/rom.mjs';
 
 // GUI adapter only. The public core remains synchronous and host-neutral.
 class N64WorkerClient {
@@ -23,7 +26,9 @@ class N64WorkerClient {
             }
         };
         this.worker.onerror = (error) =>
-            options.onError(new Error(error.message || 'N64 worker failed.'));
+            options.onError(
+                new Error(error.message || 'Nintendo worker failed.'),
+            );
     }
 
     send(type, values = {}) {
@@ -31,10 +36,18 @@ class N64WorkerClient {
     }
 
     loadROMBuffer(rom) {
-        const header = parseN64Header(rom);
+        const system = this.options.system ?? 'n64';
+        const parse = {
+            n64: parseN64Header,
+            gb: parseGBHeader,
+            gbc: parseGBHeader,
+            gba: parseGBAHeader,
+            nds: parseNDSHeader,
+        }[system];
+        const header = parse(rom);
         this.metadata = {
             ...header,
-            screen: { width: 320, height: 240 },
+            screen: header.screen ?? { width: 320, height: 240 },
             frameRate: header.region === 'PAL' ? 50 : 60,
             audioChannels: 2,
         };
@@ -43,6 +56,7 @@ class N64WorkerClient {
         this.worker.postMessage(
             {
                 type: 'load',
+                system,
                 epoch: this.epoch,
                 rom: bytes,
                 sampleRate: this.options.sampleRate,
@@ -76,6 +90,9 @@ class N64WorkerClient {
     setAnalogStick(player, x, y) {
         this.send('stick', { x, y });
     }
+    setTouch(x, y, down) {
+        this.send('touch', { x, y, down });
+    }
     pause() {
         this.epoch += 1;
         this.send('pause');
@@ -89,4 +106,4 @@ class N64WorkerClient {
     }
 }
 
-export { N64WorkerClient };
+export { N64WorkerClient, N64WorkerClient as NintendoWorkerClient };
